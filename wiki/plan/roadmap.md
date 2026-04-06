@@ -2,16 +2,16 @@
 
 ## Phase 1 — Project Setup & Infrastructure
 **Target**: Initial working skeleton
-**Status**: 🔄 In Progress
+**Status**: ✅ Done
 
 | Feature | Priority | Status | Wiki |
 |---------|----------|--------|------|
-| NestJS project scaffold | High | 📋 Planned | — |
-| React + Vite project scaffold | High | 📋 Planned | — |
-| PostgreSQL + TypeORM setup | High | 📋 Planned | `techstack/database.md` |
-| Docker compose (dev + prod) | High | 📋 Planned | `techstack/devops.md` |
+| NestJS project scaffold | High | ✅ Done | `techstack/backend.md` |
+| React + Vite project scaffold | High | ✅ Done | `techstack/frontend.md` |
+| PostgreSQL + TypeORM setup | High | ✅ Done | `techstack/database.md` |
+| Docker compose (dev + prod) | High | ✅ Done | `techstack/devops.md` |
 | CI/CD pipeline | Medium | 📋 Planned | — |
-| Auth (JWT) | High | 📋 Planned | — |
+| Auth (JWT) | High | ✅ Done | — |
 
 ## Phase 2 — Member Management
 **Target**: Full CRUD for members with status and project level

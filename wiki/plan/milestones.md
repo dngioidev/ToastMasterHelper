@@ -1,13 +1,13 @@
 # Milestones
 
 ## M1 — Working Skeleton
-**Target Date**: TBD
+**Target Date**: 2026-04-07 ✅
 **Definition of Done**:
-- [ ] Backend runs on port 3000 (`GET /health` returns 200)
-- [ ] Frontend builds and serves on port 80
-- [ ] PostgreSQL connects and migrations run
-- [ ] `docker compose up` brings up all services
-- [ ] Auth (JWT login) works end-to-end
+- [x] Backend runs on port 3000 (`GET /health` returns 200)
+- [x] Frontend builds and serves on port 80
+- [x] PostgreSQL connects and migrations run
+- [x] `docker compose up` brings up all services
+- [x] Auth (JWT login) works end-to-end
 
 ## M2 — Member Management Complete
 **Target Date**: TBD
