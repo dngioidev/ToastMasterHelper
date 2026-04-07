@@ -191,9 +191,10 @@ export class ExportService {
       { no: 5,  label: 'Speaker 2',     role: OfflineRole.SPEAKER,           slot: 1, timeline: 10, bg: 'FFD4EDDA' },
       { no: 6,  label: 'Evaluator 2',   role: OfflineRole.EVALUATOR,         slot: 1, timeline: 3 },
       { no: 7,  label: 'Topic Master',  role: OfflineRole.TOPIC_MASTER,      slot: 0, timeline: 15, bg: 'FFD6EAF8' },
-      { no: 8,  label: 'Uh-Ah Counter', role: OfflineRole.UH_AH_COUNTER,    slot: 0, timeline: 1 },
-      { no: 9,  label: 'Timer',         role: OfflineRole.TIMER,             slot: 0, timeline: 1 },
-      { no: 10, label: 'GE',            role: OfflineRole.GENERAL_EVALUATOR, slot: 0, timeline: 5 },
+      { no: 8,  label: 'Table Topic',   role: OfflineRole.TABLE_TOPIC,       slot: 0, timeline: 7 },
+      { no: 9,  label: 'Uh-Ah Counter', role: OfflineRole.UH_AH_COUNTER,    slot: 0, timeline: 1 },
+      { no: 10, label: 'Timer',         role: OfflineRole.TIMER,             slot: 0, timeline: 1 },
+      { no: 11, label: 'GE',            role: OfflineRole.GENERAL_EVALUATOR, slot: 0, timeline: 5 },
     ];
 
     // ── Column definitions: No. | Roles | Time line | [date1] | [date2] … ───

@@ -15,6 +15,7 @@ export enum OfflineRole {
   SPEAKER = 'speaker',
   EVALUATOR = 'evaluator',
   TOPIC_MASTER = 'topic_master',
+  TABLE_TOPIC = 'table_topic',
   UH_AH_COUNTER = 'uh_ah_counter',
   TIMER = 'timer',
   GENERAL_EVALUATOR = 'general_evaluator',
