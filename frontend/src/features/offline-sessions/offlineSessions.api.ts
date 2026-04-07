@@ -13,10 +13,10 @@ export const offlineSessionsApi = {
   getOne: (id: string): Promise<OfflineSession> =>
     api.get(`/sessions/offline/${id}`).then((r) => r.data),
 
-  suggest: (numSpeakers = 2, numBackup = 1): Promise<OfflineSuggestResult> =>
+  suggest: (numSpeakers = 2, numBackup = 1, date?: string): Promise<OfflineSuggestResult> =>
     api
       .get('/sessions/offline/suggest', {
-        params: { num_speakers: numSpeakers, num_backup: numBackup },
+        params: { num_speakers: numSpeakers, num_backup: numBackup, date },
       })
       .then((r) => r.data),
 

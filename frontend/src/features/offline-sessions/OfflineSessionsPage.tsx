@@ -159,6 +159,7 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
     numSpeakers,
     numBackup,
     suggestCount,
+    date,
   );
 
   const createSession = useCreateOfflineSession();

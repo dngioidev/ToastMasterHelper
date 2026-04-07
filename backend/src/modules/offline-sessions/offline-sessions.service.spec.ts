@@ -9,6 +9,7 @@ import {
 } from './offline-session-assignment.entity';
 import { MembersService } from '../members/members.service';
 import { Member, MemberStatus } from '../members/member.entity';
+import { OnlineSession } from '../online-sessions/online-session.entity';
 
 const makeMember = (overrides: Partial<Member> = {}): Member => ({
   id: 'uuid-default',
@@ -36,6 +37,11 @@ const makeAssignmentRepo = () => ({
   create: jest.fn(),
   save: jest.fn(),
   delete: jest.fn(),
+  find: jest.fn().mockResolvedValue([]),
+});
+
+const makeOnlineSessionRepo = () => ({
+  find: jest.fn().mockResolvedValue([]),
 });
 
 const makeMembersService = () => ({
@@ -54,6 +60,7 @@ describe('OfflineSessionsService', () => {
     sessionRepo = makeSessionRepo();
     assignmentRepo = makeAssignmentRepo();
     membersService = makeMembersService();
+    const onlineSessionRepo = makeOnlineSessionRepo();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OfflineSessionsService,
@@ -64,6 +71,10 @@ describe('OfflineSessionsService', () => {
         {
           provide: getRepositoryToken(OfflineSessionAssignment),
           useValue: assignmentRepo,
+        },
+        {
+          provide: getRepositoryToken(OnlineSession),
+          useValue: onlineSessionRepo,
         },
         { provide: MembersService, useValue: membersService },
       ],

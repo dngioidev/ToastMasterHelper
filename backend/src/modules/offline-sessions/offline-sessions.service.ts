@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { OfflineSession } from './offline-session.entity';
 import {
   OfflineRole,
@@ -14,6 +14,7 @@ import { CreateOfflineSessionDto } from './dto/create-offline-session.dto';
 import { UpdateOfflineSessionDto } from './dto/update-offline-session.dto';
 import { MembersService } from '../members/members.service';
 import { Member } from '../members/member.entity';
+import { OnlineSession } from '../online-sessions/online-session.entity';
 
 export interface OfflineSuggestResult {
   toast_master: Member | null;
@@ -34,6 +35,8 @@ export class OfflineSessionsService {
     private readonly sessionRepository: Repository<OfflineSession>,
     @InjectRepository(OfflineSessionAssignment)
     private readonly assignmentRepository: Repository<OfflineSessionAssignment>,
+    @InjectRepository(OnlineSession)
+    private readonly onlineSessionRepository: Repository<OnlineSession>,
     private readonly membersService: MembersService,
   ) {}
 
@@ -128,9 +131,53 @@ export class OfflineSessionsService {
   async suggest(
     numSpeakers = 2,
     numBackup = 1,
+    date?: string,
   ): Promise<OfflineSuggestResult> {
     const activeMembers = await this.membersService.findOfflineMembers();
     const assigned = new Set<string>();
+
+    // Build 2-week exclusion sets when a date is provided
+    let recentSpeakerIds = new Set<string>();
+    let recentEvaluatorIds = new Set<string>();
+
+    if (date) {
+      const target = new Date(date);
+      const windowStart = new Date(target);
+      windowStart.setDate(windowStart.getDate() - 14);
+      const windowEnd = new Date(target);
+      windowEnd.setDate(windowEnd.getDate() + 14);
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+      // Offline speaker + backup_speaker in window
+      const offlineSpeakerAssignments = await this.assignmentRepository.find({
+        where: [
+          { role: OfflineRole.SPEAKER, session: { date: Between(fmt(windowStart), fmt(windowEnd)) } },
+          { role: OfflineRole.BACKUP_SPEAKER, session: { date: Between(fmt(windowStart), fmt(windowEnd)) } },
+        ],
+        relations: ['session'],
+      });
+      for (const a of offlineSpeakerAssignments) {
+        if (a.member_id) recentSpeakerIds.add(a.member_id);
+      }
+
+      // Online speaker1/speaker2 in window
+      const onlineSessions = await this.onlineSessionRepository.find({
+        where: { date: Between(fmt(windowStart), fmt(windowEnd)) },
+      });
+      for (const s of onlineSessions) {
+        if (s.speaker1_id) recentSpeakerIds.add(s.speaker1_id);
+        if (s.speaker2_id) recentSpeakerIds.add(s.speaker2_id);
+      }
+
+      // Offline evaluator in window
+      const evaluatorAssignments = await this.assignmentRepository.find({
+        where: { role: OfflineRole.EVALUATOR, session: { date: Between(fmt(windowStart), fmt(windowEnd)) } },
+        relations: ['session'],
+      });
+      for (const a of evaluatorAssignments) {
+        if (a.member_id) recentEvaluatorIds.add(a.member_id);
+      }
+    }
 
     const pickOne = (
       sortKey: string,
@@ -176,7 +223,7 @@ export class OfflineSessionsService {
     const speakers = pickMany(
       'speaker',
       numSpeakers,
-      (m) => m.project_level < 10,
+      (m) => m.project_level < 10 && !recentSpeakerIds.has(m.id),
     );
 
     // Each evaluator must have project_level > their paired speaker
@@ -186,7 +233,8 @@ export class OfflineSessionsService {
         .filter(
           (m) =>
             !assigned.has(m.id) &&
-            m.project_level > speakerLevel,
+            m.project_level > speakerLevel &&
+            !recentEvaluatorIds.has(m.id),
         )
         .sort((a, b) => {
           const aCount = a.role_counts?.['evaluator'] ?? 0;
@@ -207,7 +255,7 @@ export class OfflineSessionsService {
     const backup_speakers = pickMany(
       'backup_speaker',
       numBackup,
-      (m) => m.project_level < 10,
+      (m) => m.project_level < 10 && !recentSpeakerIds.has(m.id),
     );
 
     return {

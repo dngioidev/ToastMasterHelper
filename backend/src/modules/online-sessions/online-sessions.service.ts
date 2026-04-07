@@ -4,12 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { OnlineSession } from './online-session.entity';
 import { CreateOnlineSessionDto } from './dto/create-online-session.dto';
 import { UpdateOnlineSessionDto } from './dto/update-online-session.dto';
 import { MembersService } from '../members/members.service';
 import { Member, MemberStatus } from '../members/member.entity';
+import {
+  OfflineRole,
+  OfflineSessionAssignment,
+} from '../offline-sessions/offline-session-assignment.entity';
 
 export interface SuggestResult {
   main_chairman: Member | null;
@@ -23,6 +27,8 @@ export class OnlineSessionsService {
   constructor(
     @InjectRepository(OnlineSession)
     private readonly sessionRepository: Repository<OnlineSession>,
+    @InjectRepository(OfflineSessionAssignment)
+    private readonly offlineAssignmentRepository: Repository<OfflineSessionAssignment>,
     private readonly membersService: MembersService,
   ) {}
 
@@ -101,6 +107,37 @@ export class OnlineSessionsService {
         .filter((id): id is string => id !== null),
     );
 
+    // Build 2-week speaker exclusion set
+    const target = new Date(date);
+    const windowStart = new Date(target);
+    windowStart.setDate(windowStart.getDate() - 14);
+    const windowEnd = new Date(target);
+    windowEnd.setDate(windowEnd.getDate() + 14);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+    const recentSpeakerIds = new Set<string>();
+
+    // Online sessions in window (speaker1/speaker2)
+    const onlineInWindow = await this.sessionRepository.find({
+      where: { date: Between(fmt(windowStart), fmt(windowEnd)) },
+    });
+    for (const s of onlineInWindow) {
+      if (s.speaker1_id) recentSpeakerIds.add(s.speaker1_id);
+      if (s.speaker2_id) recentSpeakerIds.add(s.speaker2_id);
+    }
+
+    // Offline assignments in window (speaker + backup_speaker)
+    const offlineSpeakerAssignments = await this.offlineAssignmentRepository.find({
+      where: [
+        { role: OfflineRole.SPEAKER, session: { date: Between(fmt(windowStart), fmt(windowEnd)) } },
+        { role: OfflineRole.BACKUP_SPEAKER, session: { date: Between(fmt(windowStart), fmt(windowEnd)) } },
+      ],
+      relations: ['session'],
+    });
+    for (const a of offlineSpeakerAssignments) {
+      if (a.member_id) recentSpeakerIds.add(a.member_id);
+    }
+
     // Main chairman: from chairmenPool, exclude those in last 2 sessions
     const mainChairmanCandidates = [...chairmenPool]
       .filter((m) => !recentMainChairmanIds.has(m.id))
@@ -127,12 +164,18 @@ export class OnlineSessionsService {
 
     // Speakers: from speakersPool only, project_level < 10,
     // exclude anyone already assigned as chairman (cross-pool guard)
+    // and exclude anyone who was a speaker in the ±14-day window
     const assignedIds = new Set(
       [mainChairman?.id, subChairman?.id].filter(Boolean) as string[],
     );
 
     const speakerCandidates = speakersPool
-      .filter((m) => m.project_level < 10 && !assignedIds.has(m.id))
+      .filter(
+        (m) =>
+          m.project_level < 10 &&
+          !assignedIds.has(m.id) &&
+          !recentSpeakerIds.has(m.id),
+      )
       .sort((a, b) => {
         const aCount = a.role_counts?.['speaker'] ?? 0;
         const bCount = b.role_counts?.['speaker'] ?? 0;

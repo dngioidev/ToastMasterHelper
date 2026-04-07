@@ -31,8 +31,9 @@ export class OfflineSessionsController {
     numSpeakers?: number,
     @Query('num_backup', new ParseIntPipe({ optional: true }))
     numBackup?: number,
+    @Query('date') date?: string,
   ) {
-    return this.service.suggest(numSpeakers, numBackup);
+    return this.service.suggest(numSpeakers, numBackup, date);
   }
 
   @Get(':id')

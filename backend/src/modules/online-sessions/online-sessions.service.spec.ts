@@ -5,6 +5,7 @@ import { OnlineSessionsService } from './online-sessions.service';
 import { OnlineSession } from './online-session.entity';
 import { MembersService } from '../members/members.service';
 import { Member, MemberStatus } from '../members/member.entity';
+import { OfflineSessionAssignment } from '../offline-sessions/offline-session-assignment.entity';
 
 const makeMember = (overrides: Partial<Member> = {}): Member => ({
   id: 'uuid-1',
@@ -44,10 +45,15 @@ describe('OnlineSessionsService', () => {
   beforeEach(async () => {
     repo = makeRepo();
     membersService = makeMembersService();
+    const offlineAssignmentRepo = { find: jest.fn().mockResolvedValue([]) };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OnlineSessionsService,
         { provide: getRepositoryToken(OnlineSession), useValue: repo },
+        {
+          provide: getRepositoryToken(OfflineSessionAssignment),
+          useValue: offlineAssignmentRepo,
+        },
         { provide: MembersService, useValue: membersService },
       ],
     }).compile();
@@ -103,11 +109,14 @@ describe('OnlineSessionsService', () => {
       const charlie = makeMember({ id: 'charlie', name: 'Charlie', role_counts: {} });
       membersService.findOnlineChairmen.mockResolvedValue([alice, bob, charlie]);
       membersService.findOnlineSpeakers.mockResolvedValue([alice, bob, charlie]);
-      // Last 2 sessions had alice and bob as main chairmen
-      repo.find.mockResolvedValue([
-        { main_chairman_id: 'alice' },
-        { main_chairman_id: 'bob' },
-      ]);
+      // First call: last 2 sessions for chairman exclusion
+      // Second call: sessions in date window for speaker exclusion
+      repo.find
+        .mockResolvedValueOnce([
+          { main_chairman_id: 'alice' },
+          { main_chairman_id: 'bob' },
+        ])
+        .mockResolvedValueOnce([]);
       const result = await service.suggest('2026-04-15');
       expect(result.main_chairman?.id).toBe('charlie');
     });
@@ -119,7 +128,7 @@ describe('OnlineSessionsService', () => {
       const diana = makeMember({ id: 'diana', name: 'Diana', project_level: 2 });
       membersService.findOnlineChairmen.mockResolvedValue([alice, bob, charlie, diana]);
       membersService.findOnlineSpeakers.mockResolvedValue([alice, bob, charlie, diana]);
-      repo.find.mockResolvedValue([]);
+      repo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
       const result = await service.suggest('2026-04-15');
       const speakerIds = [result.speaker1?.id, result.speaker2?.id];
       expect(speakerIds).not.toContain('alice');
@@ -132,7 +141,7 @@ describe('OnlineSessionsService', () => {
       const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 5 });
       membersService.findOnlineChairmen.mockResolvedValue([alice, bob]);
       membersService.findOnlineSpeakers.mockResolvedValue([alice, bob]);
-      repo.find.mockResolvedValue([]);
+      repo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
       const result = await service.suggest('2026-04-15');
       const allAssigned = [
         result.main_chairman?.id,

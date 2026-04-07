@@ -71,6 +71,50 @@ If during manual assignment a member is assigned more than one role in the same 
 - Warning text: "Member [Name] is assigned to [Role A] and [Role B] in the same session"
 - Auto-suggest NEVER creates duplicates — it excludes already-assigned members
 
+## 2-Week Nearby Exclusion Rule
+
+Auto-suggest enforces a **14-day window exclusion** for speaker-type and evaluator roles to prevent the same member from appearing in the same role in back-to-back nearby sessions.
+
+### Speaker-type group
+The following roles are treated as a **single speaker group** for exclusion purposes:
+- `speaker` (offline)
+- `backup_speaker` (offline)
+- `speaker1` / `speaker2` (online)
+
+A member who appeared in **any** of these roles in any session within `[date − 14 days, date + 14 days]` will be excluded from all speaker-type slots in the suggested session.
+
+### Evaluator group
+- `evaluator` (offline only)
+
+A member who was an evaluator in any offline session within `[date − 14 days, date + 14 days]` will be excluded from evaluator slots in the suggested session.
+
+### Roles NOT affected by the 2-week rule
+Toast Master, Table Tonic, Topic Master, Uh-Ah Counter, Timer, General Evaluator, Main Chairman, Sub Chairman — these roles use the standard fair-rotation algorithm only (no recency window).
+
+### Algorithm extension
+```
+windowStart = date − 14 days
+windowEnd   = date + 14 days
+
+recentSpeakerIds =
+  offline assignments WHERE role IN ('speaker','backup_speaker')
+    AND session.date BETWEEN windowStart AND windowEnd
+  UNION
+  online sessions WHERE date BETWEEN windowStart AND windowEnd
+    → collect speaker1_id and speaker2_id
+
+recentEvaluatorIds =
+  offline assignments WHERE role = 'evaluator'
+    AND session.date BETWEEN windowStart AND windowEnd
+
+// Applied in filters during suggest:
+Speaker eligibility += NOT IN recentSpeakerIds
+Backup speaker eligibility += NOT IN recentSpeakerIds
+Evaluator eligibility += NOT IN recentEvaluatorIds
+```
+
+> **Note:** Auto-suggest falls back to any eligible member if the exclusion window empties the candidate pool (e.g. very small club with few eligible speakers).
+
 ## No Eligible Candidates
 If no eligible candidates exist for a role (e.g. all Active members are level 10 for speaker):
 - Return an empty suggestions list with an error message

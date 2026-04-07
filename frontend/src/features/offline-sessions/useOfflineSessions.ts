@@ -16,10 +16,11 @@ export function useOfflineSessionSuggest(
   numSpeakers: number,
   numBackup: number,
   count: number,
+  date?: string,
 ) {
   return useQuery({
-    queryKey: ['offline-sessions', 'suggest', numSpeakers, numBackup, count],
-    queryFn: () => offlineSessionsApi.suggest(numSpeakers, numBackup),
+    queryKey: ['offline-sessions', 'suggest', numSpeakers, numBackup, count, date],
+    queryFn: () => offlineSessionsApi.suggest(numSpeakers, numBackup, date),
     enabled: count > 0,
     gcTime: 0,
   });
