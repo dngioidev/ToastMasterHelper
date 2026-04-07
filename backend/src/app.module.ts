@@ -5,6 +5,10 @@ import { TerminusModule } from '@nestjs/terminus';
 import { databaseConfig } from './config/database.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
+import { MembersModule } from './modules/members/members.module';
+import { OnlineSessionsModule } from './modules/online-sessions/online-sessions.module';
+import { OfflineSessionsModule } from './modules/offline-sessions/offline-sessions.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -18,6 +22,10 @@ import { HealthModule } from './modules/health/health.module';
     TerminusModule,
     AuthModule,
     HealthModule,
+    MembersModule,
+    OnlineSessionsModule,
+    OfflineSessionsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

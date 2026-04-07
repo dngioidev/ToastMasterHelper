@@ -1,0 +1,140 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { OnlineSessionsService } from './online-sessions.service';
+import { OnlineSession } from './online-session.entity';
+import { MembersService } from '../members/members.service';
+import { Member, MemberStatus } from '../members/member.entity';
+
+const makeMember = (overrides: Partial<Member> = {}): Member => ({
+  id: 'uuid-1',
+  name: 'Alice',
+  status: MemberStatus.ACTIVE,
+  project_level: 3,
+  role_counts: {},
+  created_at: new Date(),
+  updated_at: new Date(),
+  ...overrides,
+});
+
+const makeRepo = () => ({
+  find: jest.fn(),
+  findOneBy: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  remove: jest.fn(),
+});
+
+const makeMembersService = () => ({
+  findActiveMembers: jest.fn(),
+  findEligibleSpeakers: jest.fn(),
+  incrementRoleCount: jest.fn().mockResolvedValue(undefined),
+  findOne: jest.fn(),
+});
+
+describe('OnlineSessionsService', () => {
+  let service: OnlineSessionsService;
+  let repo: ReturnType<typeof makeRepo>;
+  let membersService: ReturnType<typeof makeMembersService>;
+
+  beforeEach(async () => {
+    repo = makeRepo();
+    membersService = makeMembersService();
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OnlineSessionsService,
+        { provide: getRepositoryToken(OnlineSession), useValue: repo },
+        { provide: MembersService, useValue: membersService },
+      ],
+    }).compile();
+    service = module.get<OnlineSessionsService>(OnlineSessionsService);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('findOne', () => {
+    it('should throw NotFoundException if session not found', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      await expect(service.findOne('bad-id')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('create', () => {
+    it('should throw BadRequestException if session date already exists', async () => {
+      repo.findOneBy.mockResolvedValue({ id: 'existing' });
+      await expect(
+        service.create({ date: '2026-04-08' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create and increment role counts', async () => {
+      repo.findOneBy.mockResolvedValue(null);
+      const session = { id: 'new-id', date: '2026-04-08' } as OnlineSession;
+      repo.create.mockReturnValue(session);
+      repo.save.mockResolvedValue(session);
+      await service.create({
+        date: '2026-04-08',
+        main_chairman_id: 'mc-id',
+        speaker1_id: 'sp1-id',
+      });
+      expect(membersService.incrementRoleCount).toHaveBeenCalledWith(
+        'mc-id',
+        'main_chairman',
+      );
+      expect(membersService.incrementRoleCount).toHaveBeenCalledWith(
+        'sp1-id',
+        'speaker',
+      );
+    });
+  });
+
+  describe('suggest', () => {
+    it('should suggest main chairman excluding last 2 session chairs', async () => {
+      const alice = makeMember({ id: 'alice', name: 'Alice', role_counts: { main_chairman: 1 } });
+      const bob = makeMember({ id: 'bob', name: 'Bob', role_counts: { main_chairman: 0 } });
+      const charlie = makeMember({ id: 'charlie', name: 'Charlie', role_counts: {} });
+      membersService.findActiveMembers.mockResolvedValue([alice, bob, charlie]);
+      // Last 2 sessions had alice and bob as main chairmen
+      repo.find.mockResolvedValue([
+        { main_chairman_id: 'alice' },
+        { main_chairman_id: 'bob' },
+      ]);
+      const result = await service.suggest('2026-04-15');
+      expect(result.main_chairman?.id).toBe('charlie');
+    });
+
+    it('should exclude project_level 10 members from speaker suggestions', async () => {
+      const alice = makeMember({ id: 'alice', name: 'Alice', project_level: 10 });
+      const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 3 });
+      const charlie = makeMember({ id: 'charlie', name: 'Charlie', project_level: 5 });
+      const diana = makeMember({ id: 'diana', name: 'Diana', project_level: 2 });
+      membersService.findActiveMembers.mockResolvedValue([alice, bob, charlie, diana]);
+      repo.find.mockResolvedValue([]);
+      const result = await service.suggest('2026-04-15');
+      const speakerIds = [result.speaker1?.id, result.speaker2?.id];
+      expect(speakerIds).not.toContain('alice');
+      // bob, charlie, or diana should be among speakers
+      expect(speakerIds.some((id) => ['bob', 'charlie', 'diana'].includes(id ?? ''))).toBe(true);
+    });
+
+    it('should not assign the same person as both chairman and speaker', async () => {
+      const alice = makeMember({ id: 'alice', name: 'Alice', project_level: 3 });
+      const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 5 });
+      membersService.findActiveMembers.mockResolvedValue([alice, bob]);
+      repo.find.mockResolvedValue([]);
+      const result = await service.suggest('2026-04-15');
+      const allAssigned = [
+        result.main_chairman?.id,
+        result.sub_chairman?.id,
+        result.speaker1?.id,
+        result.speaker2?.id,
+      ].filter(Boolean);
+      const uniqueIds = new Set(allAssigned);
+      expect(uniqueIds.size).toBe(allAssigned.length);
+    });
+  });
+});
