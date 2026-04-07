@@ -34,4 +34,12 @@ export interface CreateOnlineSessionPayload {
   is_cancelled?: boolean;
 }
 
-export type UpdateOnlineSessionPayload = Partial<CreateOnlineSessionPayload>;
+export interface UpdateOnlineSessionPayload {
+  date?: string;
+  main_chairman_id?: string | null;
+  sub_chairman_id?: string | null;
+  speaker1_id?: string | null;
+  speaker2_id?: string | null;
+  notes?: string | null;
+  is_cancelled?: boolean;
+}

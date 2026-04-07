@@ -8,7 +8,7 @@ import {
   useOnlineSessionSuggest,
 } from './useOnlineSessions';
 import { useMembers } from '../members/useMembers';
-import type { OnlineSession } from './onlineSession.types';
+import type { OnlineSession, CreateOnlineSessionPayload, UpdateOnlineSessionPayload } from './onlineSession.types';
 import type { Member } from '../members/member.types';
 
 function getNextWednesday(): string {
@@ -97,17 +97,25 @@ function SessionForm({ session, onClose }: SessionFormProps) {
   };
 
   const handleSave = () => {
-    const payload = {
-      date,
-      main_chairman_id: mainChairmanId || undefined,
-      sub_chairman_id: subChairmanId || undefined,
-      speaker1_id: speaker1Id || undefined,
-      speaker2_id: speaker2Id || undefined,
-      is_cancelled: isCancelled,
-    };
     if (isEdit) {
+      const payload: UpdateOnlineSessionPayload = {
+        date,
+        main_chairman_id: mainChairmanId || null,
+        sub_chairman_id: subChairmanId || null,
+        speaker1_id: speaker1Id || null,
+        speaker2_id: speaker2Id || null,
+        is_cancelled: isCancelled,
+      };
       updateSession.mutate({ id: session.id, payload }, { onSuccess: onClose });
     } else {
+      const payload: CreateOnlineSessionPayload = {
+        date,
+        main_chairman_id: mainChairmanId || undefined,
+        sub_chairman_id: subChairmanId || undefined,
+        speaker1_id: speaker1Id || undefined,
+        speaker2_id: speaker2Id || undefined,
+        is_cancelled: isCancelled,
+      };
       createSession.mutate(payload, { onSuccess: onClose });
     }
   };

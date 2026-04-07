@@ -74,9 +74,9 @@ export class OnlineSessionsService {
     id: string,
     dto: UpdateOnlineSessionDto,
   ): Promise<OnlineSession> {
-    const session = await this.findOne(id);
-    Object.assign(session, dto);
-    return this.sessionRepository.save(session);
+    await this.findOne(id); // throws 404 if not found
+    await this.sessionRepository.update(id, dto);
+    return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
