@@ -22,6 +22,7 @@ export interface OfflineSuggestResult {
   speakers: Member[];
   evaluators: (Member | null)[];
   topic_master: Member | null;
+  table_topic: Member | null;
   uh_ah_counter: Member | null;
   timer: Member | null;
   general_evaluator: Member | null;
@@ -248,6 +249,7 @@ export class OfflineSessionsService {
     });
 
     const topic_master = pickOne('topic_master');
+    const table_topic = pickOne('table_topic');
     const uh_ah_counter = pickOne('uh_ah_counter');
     const timer = pickOne('timer');
     const general_evaluator = pickOne('general_evaluator');
@@ -264,6 +266,7 @@ export class OfflineSessionsService {
       speakers,
       evaluators,
       topic_master,
+      table_topic,
       uh_ah_counter,
       timer,
       general_evaluator,

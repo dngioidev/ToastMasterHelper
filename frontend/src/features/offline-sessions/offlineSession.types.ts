@@ -6,6 +6,7 @@ export enum OfflineRole {
   SPEAKER = 'speaker',
   EVALUATOR = 'evaluator',
   TOPIC_MASTER = 'topic_master',
+  TABLE_TOPIC = 'table_topic',
   UH_AH_COUNTER = 'uh_ah_counter',
   TIMER = 'timer',
   GENERAL_EVALUATOR = 'general_evaluator',
@@ -18,6 +19,7 @@ export const OFFLINE_ROLE_LABELS: Record<OfflineRole, string> = {
   [OfflineRole.SPEAKER]: 'Speaker',
   [OfflineRole.EVALUATOR]: 'Evaluator',
   [OfflineRole.TOPIC_MASTER]: 'Topic Master',
+  [OfflineRole.TABLE_TOPIC]: 'Table Topic',
   [OfflineRole.UH_AH_COUNTER]: 'Uh/Ah Counter',
   [OfflineRole.TIMER]: 'Timer',
   [OfflineRole.GENERAL_EVALUATOR]: 'General Evaluator',
@@ -53,6 +55,7 @@ export interface OfflineSuggestResult {
   speakers: Member[];
   evaluators: (Member | null)[];
   topic_master: Member | null;
+  table_topic: Member | null;
   uh_ah_counter: Member | null;
   timer: Member | null;
   general_evaluator: Member | null;

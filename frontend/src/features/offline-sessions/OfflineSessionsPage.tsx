@@ -23,6 +23,7 @@ const ROLE_TIME: Partial<Record<OfflineRole, string>> = {
   [OfflineRole.SPEAKER]: '10',
   [OfflineRole.EVALUATOR]: '3',
   [OfflineRole.TOPIC_MASTER]: '15',
+  [OfflineRole.TABLE_TOPIC]: '7',
   [OfflineRole.UH_AH_COUNTER]: '1',
   [OfflineRole.TIMER]: '1',
   [OfflineRole.GENERAL_EVALUATOR]: '5',
@@ -47,6 +48,7 @@ function buildRows(maxSpeakers: number, maxBackup: number): RowDef[] {
     rows.push({ no: no++, label: `Evaluator ${i + 1}`, role: OfflineRole.EVALUATOR, slot: i, isBackup: false });
   }
   rows.push({ no: no++, label: 'Topic Master', role: OfflineRole.TOPIC_MASTER, slot: 0, isBackup: false });
+  rows.push({ no: no++, label: 'Table Topic', role: OfflineRole.TABLE_TOPIC, slot: 0, isBackup: false });
   rows.push({ no: no++, label: 'Uh/Ah Counter', role: OfflineRole.UH_AH_COUNTER, slot: 0, isBackup: false });
   rows.push({ no: no++, label: 'Timer', role: OfflineRole.TIMER, slot: 0, isBackup: false });
   rows.push({ no: no++, label: 'GE', role: OfflineRole.GENERAL_EVALUATOR, slot: 0, isBackup: false });
@@ -180,6 +182,7 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
     suggestion.speakers.forEach((s, i) => { if (s) newMap[`${OfflineRole.SPEAKER}:${i}`] = s.id; });
     suggestion.evaluators.forEach((e, i) => { if (e) newMap[`${OfflineRole.EVALUATOR}:${i}`] = e.id; });
     if (suggestion.topic_master) newMap[`${OfflineRole.TOPIC_MASTER}:0`] = suggestion.topic_master.id;
+    if (suggestion.table_topic) newMap[`${OfflineRole.TABLE_TOPIC}:0`] = suggestion.table_topic.id;
     if (suggestion.uh_ah_counter) newMap[`${OfflineRole.UH_AH_COUNTER}:0`] = suggestion.uh_ah_counter.id;
     if (suggestion.timer) newMap[`${OfflineRole.TIMER}:0`] = suggestion.timer.id;
     if (suggestion.general_evaluator) newMap[`${OfflineRole.GENERAL_EVALUATOR}:0`] = suggestion.general_evaluator.id;
