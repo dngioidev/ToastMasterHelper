@@ -1,46 +1,18 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
 import dayjs from 'dayjs';
 import {
   useOfflineSessions,
   useCreateOfflineSession,
+  useUpdateOfflineSession,
   useDeleteOfflineSession,
   useOfflineSessionSuggest,
 } from './useOfflineSessions';
+import { useMembers } from '../members/useMembers';
 import { OfflineRole } from './offlineSession.types';
 import type {
-  AssignmentPayload,
   OfflineSession,
   OfflineSessionAssignment,
-  OfflineSuggestResult,
 } from './offlineSession.types';
-import type { Member } from '../members/member.types';
-
-function buildAssignmentsFromSuggestion(
-  suggestion: OfflineSuggestResult,
-): AssignmentPayload[] {
-  const assignments: AssignmentPayload[] = [];
-  const addOne = (member: Member | null, role: OfflineRole, slot = 0) => {
-    if (member) {
-      assignments.push({ member_id: member.id, role, slot_index: slot });
-    }
-  };
-  addOne(suggestion.toast_master, OfflineRole.TOAST_MASTER);
-  addOne(suggestion.table_tonic, OfflineRole.TABLE_TONIC);
-  suggestion.speakers.forEach((s, i) =>
-    addOne(s, OfflineRole.SPEAKER, i),
-  );
-  suggestion.evaluators.forEach((e, i) =>
-    addOne(e, OfflineRole.EVALUATOR, i),
-  );
-  addOne(suggestion.topic_master, OfflineRole.TOPIC_MASTER);
-  addOne(suggestion.uh_ah_counter, OfflineRole.UH_AH_COUNTER);
-  addOne(suggestion.timer, OfflineRole.TIMER);
-  addOne(suggestion.general_evaluator, OfflineRole.GENERAL_EVALUATOR);
-  suggestion.backup_speakers.forEach((b, i) =>
-    addOne(b, OfflineRole.BACKUP_SPEAKER, i),
-  );
-  return assignments;
-}
 
 // ─── Timetable helpers ────────────────────────────────────────────────────────
 
@@ -114,62 +86,157 @@ function CellContent({
   return <span>{name}</span>;
 }
 
-interface CreateSessionFormProps {
+// ─── Shared member select ─────────────────────────────────────────────────────
+
+function MemberSelect({
+  id,
+  value,
+  onChange,
+  members,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  members: { id: string; name: string }[];
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+    >
+      <option value="">— Unassigned —</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// ─── Offline session form (create + edit) ────────────────────────────────────
+
+interface OfflineSessionFormProps {
+  session?: OfflineSession;
   onClose: () => void;
 }
 
-function CreateSessionForm({ onClose }: CreateSessionFormProps) {
-  const [date, setDate] = useState(dayjs().add(1, 'week').format('YYYY-MM-DD'));
-  const [numSpeakers, setNumSpeakers] = useState(2);
-  const [numBackup, setNumBackup] = useState(1);
-  const [runSuggest, setRunSuggest] = useState(false);
-  const { data: suggestion, isLoading: isSuggesting } =
-    useOfflineSessionSuggest(numSpeakers, numBackup, runSuggest);
+function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
+  const isEdit = session !== undefined;
+
+  const [date, setDate] = useState(
+    session?.date ?? dayjs().add(1, 'week').format('YYYY-MM-DD'),
+  );
+  const [numSpeakers, setNumSpeakers] = useState(session?.num_speakers ?? 2);
+  const [numBackup, setNumBackup] = useState(session?.num_backup_speakers ?? 1);
+  const [isCancelled, setIsCancelled] = useState(session?.is_cancelled ?? false);
+  const [suggestCount, setSuggestCount] = useState(0);
+
+  // role:slot → member_id
+  const [roleMap, setRoleMap] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    session?.assignments.forEach((a) => {
+      map[`${a.role}:${a.slot_index}`] = a.member_id ?? '';
+    });
+    return map;
+  });
+
+  // role:slot → passed
+  const [passedMap, setPassedMap] = useState<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    session?.assignments.forEach((a) => {
+      map[`${a.role}:${a.slot_index}`] = a.passed;
+    });
+    return map;
+  });
+
+  const { data: membersPage } = useMembers();
+  const members = membersPage?.data ?? [];
+
+  const { data: suggestion, isLoading: isSuggesting } = useOfflineSessionSuggest(
+    numSpeakers,
+    numBackup,
+    suggestCount,
+  );
+
   const createSession = useCreateOfflineSession();
+  const updateSession = useUpdateOfflineSession();
+  const isPending = createSession.isPending || updateSession.isPending;
+
+  // Apply suggestion into roleMap whenever a new suggestion arrives
+  useEffect(() => {
+    if (!suggestion) return;
+    const newMap: Record<string, string> = {};
+    if (suggestion.toast_master) newMap[`${OfflineRole.TOAST_MASTER}:0`] = suggestion.toast_master.id;
+    if (suggestion.table_tonic) newMap[`${OfflineRole.TABLE_TONIC}:0`] = suggestion.table_tonic.id;
+    suggestion.speakers.forEach((s, i) => { if (s) newMap[`${OfflineRole.SPEAKER}:${i}`] = s.id; });
+    suggestion.evaluators.forEach((e, i) => { if (e) newMap[`${OfflineRole.EVALUATOR}:${i}`] = e.id; });
+    if (suggestion.topic_master) newMap[`${OfflineRole.TOPIC_MASTER}:0`] = suggestion.topic_master.id;
+    if (suggestion.uh_ah_counter) newMap[`${OfflineRole.UH_AH_COUNTER}:0`] = suggestion.uh_ah_counter.id;
+    if (suggestion.timer) newMap[`${OfflineRole.TIMER}:0`] = suggestion.timer.id;
+    if (suggestion.general_evaluator) newMap[`${OfflineRole.GENERAL_EVALUATOR}:0`] = suggestion.general_evaluator.id;
+    suggestion.backup_speakers.forEach((b, i) => { if (b) newMap[`${OfflineRole.BACKUP_SPEAKER}:${i}`] = b.id; });
+    setRoleMap(newMap);
+  }, [suggestion]);
+
+  const setRole = (role: OfflineRole, slot: number, memberId: string) => {
+    setRoleMap((prev) => ({ ...prev, [`${role}:${slot}`]: memberId }));
+  };
+
+  const setPassed = (role: OfflineRole, slot: number, value: boolean) => {
+    setPassedMap((prev) => ({ ...prev, [`${role}:${slot}`]: value }));
+  };
 
   const handleSave = () => {
-    const assignments = suggestion
-      ? buildAssignmentsFromSuggestion(suggestion)
-      : [];
-    createSession.mutate(
-      { date, num_speakers: numSpeakers, num_backup_speakers: numBackup, assignments },
-      { onSuccess: onClose },
-    );
+    const assignments = Object.entries(roleMap)
+      .filter(([, memberId]) => memberId !== '')
+      .map(([key, memberId]) => {
+        const colonIdx = key.indexOf(':');
+        const role = key.substring(0, colonIdx) as OfflineRole;
+        const slotIndex = parseInt(key.substring(colonIdx + 1), 10);
+        return { member_id: memberId, role, slot_index: slotIndex, passed: passedMap[key] ?? false };
+      });
+    const payload = { date, num_speakers: numSpeakers, num_backup_speakers: numBackup, is_cancelled: isCancelled, assignments };
+    if (isEdit) {
+      updateSession.mutate({ id: session.id, payload }, { onSuccess: onClose });
+    } else {
+      createSession.mutate(payload, { onSuccess: onClose });
+    }
   };
+
+  // Build form rows using the same helper as the timetable
+  const formRows = buildRows(numSpeakers, numBackup);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       role="dialog"
       aria-modal="true"
-      aria-label="Create offline session"
+      aria-label={isEdit ? 'Edit offline session' : 'Create offline session'}
     >
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold text-gray-900">
-          New Offline Session
+          {isEdit ? 'Edit Offline Session' : 'New Offline Session'}
         </h2>
 
+        {/* Date + counts */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label
-              htmlFor="offline-date"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="offline-date" className="block text-sm font-medium text-gray-700 mb-1">
               Date
             </label>
             <input
               id="offline-date"
               type="date"
               value={date}
-              onChange={(e) => { setDate(e.target.value); setRunSuggest(false); }}
+              onChange={(e) => { setDate(e.target.value); setSuggestCount(0); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label
-              htmlFor="num-speakers"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="num-speakers" className="block text-sm font-medium text-gray-700 mb-1">
               Speakers
             </label>
             <input
@@ -178,15 +245,12 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
               min={1}
               max={5}
               value={numSpeakers}
-              onChange={(e) => { setNumSpeakers(Number(e.target.value)); setRunSuggest(false); }}
+              onChange={(e) => { setNumSpeakers(Number(e.target.value)); setSuggestCount(0); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label
-              htmlFor="num-backup"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="num-backup" className="block text-sm font-medium text-gray-700 mb-1">
               Backups
             </label>
             <input
@@ -195,57 +259,80 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
               min={0}
               max={3}
               value={numBackup}
-              onChange={(e) => { setNumBackup(Number(e.target.value)); setRunSuggest(false); }}
+              onChange={(e) => { setNumBackup(Number(e.target.value)); setSuggestCount(0); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
+        {/* Auto-suggest */}
         <button
-          onClick={() => setRunSuggest(true)}
+          onClick={() => { setRoleMap({}); setSuggestCount((c) => c + 1); }}
           disabled={isSuggesting}
           className="w-full border border-blue-300 text-blue-600 rounded-lg py-2 text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition-colors"
         >
-          {isSuggesting ? 'Generating suggestions…' : '✨ Auto-Suggest Roles'}
+          {isSuggesting ? 'Generating…' : '✨ Auto-Suggest Roles'}
         </button>
 
-        {suggestion && (
-          <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
-            {[
-              ['Toast Master', suggestion.toast_master?.name],
-              ['Table Tonic', suggestion.table_tonic?.name],
-              ...suggestion.speakers.map((s, i) => [
-                `Speaker ${i + 1}`,
-                s ? `${s.name} (P${s.project_level + 1})` : '—',
-              ]),
-              ...suggestion.evaluators.map((e, i) => [
-                `Evaluator ${i + 1}`,
-                e?.name ?? 'No eligible evaluator',
-              ]),
-              ['Topic Master', suggestion.topic_master?.name],
-              ['Uh/Ah Counter', suggestion.uh_ah_counter?.name],
-              ['Timer', suggestion.timer?.name],
-              ['General Evaluator', suggestion.general_evaluator?.name],
-              ...suggestion.backup_speakers.map((b, i) => [
-                `Backup Speaker ${i + 1}`,
-                b ? `${b.name} (P${b.project_level + 1})` : '—',
-              ]),
-            ].map(([label, value]) => (
-              <div key={label as string} className="flex justify-between">
-                <span className="text-gray-500">{label as string}</span>
-                <span className="font-medium">{(value as string) ?? '—'}</span>
+        {/* Role dropdowns */}
+        {formRows.map((row, idx) => {
+          const key = `${row.role}:${row.slot}`;
+          const showSep = row.isBackup && !formRows[idx - 1]?.isBackup;
+          return (
+            <div key={key}>
+              {showSep && (
+                <div className="border-t-2 border-dashed border-gray-200 my-2" />
+              )}
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label htmlFor={`role-${key}`} className="block text-xs font-medium text-gray-500 mb-1">
+                    {row.label}
+                    {row.isBackup && <span className="ml-1 text-gray-400 italic">(backup)</span>}
+                  </label>
+                  <MemberSelect
+                    id={`role-${key}`}
+                    value={roleMap[key] ?? ''}
+                    onChange={(v) => setRole(row.role, row.slot, v)}
+                    members={members}
+                  />
+                </div>
+                {(row.role === OfflineRole.SPEAKER || row.role === OfflineRole.BACKUP_SPEAKER) && (
+                  <label className="flex items-center gap-1 text-xs text-gray-500 mt-4 cursor-pointer whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={passedMap[key] ?? false}
+                      onChange={(e) => setPassed(row.role, row.slot, e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-gray-300 text-green-500 focus:ring-green-400"
+                    />
+                    Passed
+                  </label>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+          );
+        })}
+
+        {/* Cancelled toggle */}
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isCancelled}
+              onChange={(e) => setIsCancelled(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-red-500 focus:ring-red-400"
+            />
+            Mark as Cancelled
+          </label>
         )}
 
+        {/* Actions */}
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            disabled={createSession.isPending}
+            disabled={isPending}
             className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {createSession.isPending ? 'Saving…' : 'Save Session'}
+            {isPending ? 'Saving…' : 'Save Session'}
           </button>
           <button
             onClick={onClose}
@@ -263,6 +350,7 @@ export function OfflineSessionsPage() {
   const { data: sessions, isLoading, error } = useOfflineSessions();
   const deleteSession = useDeleteOfflineSession();
   const [showCreate, setShowCreate] = useState(false);
+  const [editingSession, setEditingSession] = useState<OfflineSession | null>(null);
 
   const handleDelete = (id: string) => {
     if (window.confirm('Delete this session?')) {
@@ -337,13 +425,22 @@ export function OfflineSessionsPage() {
                           Cancelled
                         </span>
                       )}
-                      <button
-                        onClick={() => handleDelete(s.id)}
-                        className="text-gray-300 hover:text-red-500 text-xs font-normal transition-colors"
-                        aria-label={`Delete session ${dayjs(s.date).format('MMM D, YYYY')}`}
-                      >
-                        ✕ Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingSession(s)}
+                          className="text-blue-400 hover:text-blue-600 text-xs font-normal transition-colors"
+                          aria-label={`Edit session ${dayjs(s.date).format('MMM D, YYYY')}`}
+                        >
+                          ✏ Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(s.id)}
+                          className="text-gray-300 hover:text-red-500 text-xs font-normal transition-colors"
+                          aria-label={`Delete session ${dayjs(s.date).format('MMM D, YYYY')}`}
+                        >
+                          ✕ Delete
+                        </button>
+                      </div>
                     </div>
                   </th>
                 ))}
@@ -411,7 +508,13 @@ export function OfflineSessionsPage() {
         </div>
       )}
 
-      {showCreate && <CreateSessionForm onClose={() => setShowCreate(false)} />}
+      {showCreate && <OfflineSessionForm onClose={() => setShowCreate(false)} />}
+      {editingSession && (
+        <OfflineSessionForm
+          session={editingSession}
+          onClose={() => setEditingSession(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import {
   useOnlineSessions,
   useCreateOnlineSession,
+  useUpdateOnlineSession,
   useDeleteOnlineSession,
   useOnlineSessionSuggest,
 } from './useOnlineSessions';
+import { useMembers } from '../members/useMembers';
 import type { OnlineSession } from './onlineSession.types';
+import type { Member } from '../members/member.types';
 
 function getNextWednesday(): string {
   const today = dayjs();
@@ -14,104 +17,181 @@ function getNextWednesday(): string {
   return today.add(daysUntilWed, 'day').format('YYYY-MM-DD');
 }
 
-interface CreateSessionFormProps {
+// ─── Shared member select ─────────────────────────────────────────────────────
+
+function MemberSelect({
+  id,
+  value,
+  onChange,
+  members,
+  placeholder = '— Unassigned —',
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  members: Member[];
+  placeholder?: string;
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+    >
+      <option value="">{placeholder}</option>
+      {members.map((m) => (
+        <option key={m.id} value={m.id}>
+          {m.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// ─── Session form (create + edit) ────────────────────────────────────────────
+
+interface SessionFormProps {
+  session?: OnlineSession;
   onClose: () => void;
 }
 
-function CreateSessionForm({ onClose }: CreateSessionFormProps) {
-  const [date, setDate] = useState(getNextWednesday());
-  const [runSuggest, setRunSuggest] = useState(false);
+function SessionForm({ session, onClose }: SessionFormProps) {
+  const isEdit = session !== undefined;
+
+  const [date, setDate] = useState(session?.date ?? getNextWednesday());
+  const [mainChairmanId, setMainChairmanId] = useState(session?.main_chairman_id ?? '');
+  const [subChairmanId, setSubChairmanId] = useState(session?.sub_chairman_id ?? '');
+  const [speaker1Id, setSpeaker1Id] = useState(session?.speaker1_id ?? '');
+  const [speaker2Id, setSpeaker2Id] = useState(session?.speaker2_id ?? '');
+  const [isCancelled, setIsCancelled] = useState(session?.is_cancelled ?? false);
+  const [suggestCount, setSuggestCount] = useState(0);
+
+  const { data: membersPage } = useMembers();
+  const members = membersPage?.data ?? [];
+
   const { data: suggestion, isLoading: isSuggesting } = useOnlineSessionSuggest(
     date,
-    runSuggest,
+    suggestCount,
   );
+
   const createSession = useCreateOnlineSession();
+  const updateSession = useUpdateOnlineSession();
+  const isPending = createSession.isPending || updateSession.isPending;
+
+  // Apply suggestion into dropdowns whenever a new suggestion arrives
+  useEffect(() => {
+    if (!suggestion) return;
+    if (suggestion.main_chairman?.id) setMainChairmanId(suggestion.main_chairman.id);
+    if (suggestion.sub_chairman?.id) setSubChairmanId(suggestion.sub_chairman.id);
+    if (suggestion.speaker1?.id) setSpeaker1Id(suggestion.speaker1.id);
+    if (suggestion.speaker2?.id) setSpeaker2Id(suggestion.speaker2.id);
+  }, [suggestion]);
+
+  const handleSuggest = () => {
+    setMainChairmanId('');
+    setSubChairmanId('');
+    setSpeaker1Id('');
+    setSpeaker2Id('');
+    setSuggestCount((c) => c + 1);
+  };
 
   const handleSave = () => {
-    createSession.mutate(
-      {
-        date,
-        main_chairman_id: suggestion?.main_chairman?.id,
-        sub_chairman_id: suggestion?.sub_chairman?.id,
-        speaker1_id: suggestion?.speaker1?.id,
-        speaker2_id: suggestion?.speaker2?.id,
-      },
-      { onSuccess: onClose },
-    );
+    const payload = {
+      date,
+      main_chairman_id: mainChairmanId || undefined,
+      sub_chairman_id: subChairmanId || undefined,
+      speaker1_id: speaker1Id || undefined,
+      speaker2_id: speaker2Id || undefined,
+      is_cancelled: isCancelled,
+    };
+    if (isEdit) {
+      updateSession.mutate({ id: session.id, payload }, { onSuccess: onClose });
+    } else {
+      createSession.mutate(payload, { onSuccess: onClose });
+    }
   };
+
+  const ROLE_FIELDS = [
+    { label: 'Main Chairman', value: mainChairmanId, setter: setMainChairmanId, inputId: 'main-chairman' },
+    { label: 'Sub Chairman', value: subChairmanId, setter: setSubChairmanId, inputId: 'sub-chairman' },
+    { label: 'Speaker 1', value: speaker1Id, setter: setSpeaker1Id, inputId: 'speaker-1' },
+    { label: 'Speaker 2', value: speaker2Id, setter: setSpeaker2Id, inputId: 'speaker-2' },
+  ] as const;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       role="dialog"
       aria-modal="true"
-      aria-label="Create online session"
+      aria-label={isEdit ? 'Edit online session' : 'Create online session'}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold text-gray-900">
-          New Online Session
+          {isEdit ? 'Edit Online Session' : 'New Online Session'}
         </h2>
 
+        {/* Date */}
         <div>
-          <label
-            htmlFor="session-date"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
+          <label htmlFor="session-date" className="block text-sm font-medium text-gray-700 mb-1">
             Session Date
           </label>
           <input
             id="session-date"
             type="date"
             value={date}
-            onChange={(e) => { setDate(e.target.value); setRunSuggest(false); }}
+            onChange={(e) => { setDate(e.target.value); setSuggestCount(0); }}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
+        {/* Auto-suggest button */}
         <button
-          onClick={() => setRunSuggest(true)}
+          onClick={handleSuggest}
           disabled={isSuggesting}
           className="w-full border border-blue-300 text-blue-600 rounded-lg py-2 text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition-colors"
         >
-          {isSuggesting ? 'Generating suggestions…' : '✨ Auto-Suggest Roles'}
+          {isSuggesting ? 'Generating…' : '✨ Auto-Suggest Roles'}
         </button>
 
-        {suggestion && (
-          <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Main Chairman</span>
-              <span className="font-medium">
-                {suggestion.main_chairman?.name ?? '—'}
-              </span>
+        {/* Role dropdowns */}
+        <div className="space-y-3">
+          {ROLE_FIELDS.map(({ label, value, setter, inputId }) => (
+            <div key={inputId}>
+              <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
+                {label}
+              </label>
+              <MemberSelect
+                id={inputId}
+                value={value}
+                onChange={setter}
+                members={members}
+              />
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Sub Chairman</span>
-              <span className="font-medium">
-                {suggestion.sub_chairman?.name ?? '—'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Speaker 1</span>
-              <span className="font-medium">
-                {suggestion.speaker1?.name ?? '—'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Speaker 2</span>
-              <span className="font-medium">
-                {suggestion.speaker2?.name ?? '—'}
-              </span>
-            </div>
-          </div>
+          ))}
+        </div>
+
+        {/* Cancelled toggle (edit mode only) */}
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isCancelled}
+              onChange={(e) => setIsCancelled(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-red-500 focus:ring-red-400"
+            />
+            Mark as Cancelled
+          </label>
         )}
 
+        {/* Actions */}
         <div className="flex gap-3">
           <button
             onClick={handleSave}
-            disabled={createSession.isPending}
+            disabled={isPending}
             className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {createSession.isPending ? 'Saving…' : 'Save Session'}
+            {isPending ? 'Saving…' : 'Save Session'}
           </button>
           <button
             onClick={onClose}
@@ -129,6 +209,7 @@ export function OnlineSessionsPage() {
   const { data: sessions, isLoading, error } = useOnlineSessions();
   const deleteSession = useDeleteOnlineSession();
   const [showCreate, setShowCreate] = useState(false);
+  const [editingSession, setEditingSession] = useState<OnlineSession | null>(null);
 
   const handleDelete = (id: string) => {
     if (window.confirm('Delete this session?')) {
@@ -165,34 +246,19 @@ export function OnlineSessionsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Date
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Main Chairman
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Sub Chairman
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Speaker 1
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Speaker 2
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">
-                  Status
-                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Main Chairman</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Sub Chairman</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Speaker 1</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Speaker 2</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(sessions?.length === 0) && (
+              {sessions?.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="text-center text-gray-400 py-8 text-sm"
-                  >
+                  <td colSpan={7} className="text-center text-gray-400 py-8 text-sm">
                     No sessions yet. Create the first one!
                   </td>
                 </tr>
@@ -216,22 +282,26 @@ export function OnlineSessionsPage() {
                   </td>
                   <td className="px-4 py-3">
                     {session.is_cancelled ? (
-                      <span className="text-red-500 text-xs font-medium">
-                        Cancelled
-                      </span>
+                      <span className="text-red-500 text-xs font-medium">Cancelled</span>
                     ) : (
-                      <span className="text-green-600 text-xs font-medium">
-                        Scheduled
-                      </span>
+                      <span className="text-green-600 text-xs font-medium">Scheduled</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(session.id)}
-                      className="text-red-500 hover:text-red-700 text-xs font-medium"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setEditingSession(session)}
+                        className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(session.id)}
+                        className="text-red-500 hover:text-red-700 text-xs font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -240,7 +310,13 @@ export function OnlineSessionsPage() {
         </div>
       )}
 
-      {showCreate && <CreateSessionForm onClose={() => setShowCreate(false)} />}
+      {showCreate && <SessionForm onClose={() => setShowCreate(false)} />}
+      {editingSession && (
+        <SessionForm
+          session={editingSession}
+          onClose={() => setEditingSession(null)}
+        />
+      )}
     </div>
   );
 }

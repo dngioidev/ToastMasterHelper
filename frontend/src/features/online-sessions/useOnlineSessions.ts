@@ -12,11 +12,12 @@ export function useOnlineSessions() {
   });
 }
 
-export function useOnlineSessionSuggest(date: string, enabled: boolean) {
+export function useOnlineSessionSuggest(date: string, count: number) {
   return useQuery({
-    queryKey: ['online-sessions', 'suggest', date],
+    queryKey: ['online-sessions', 'suggest', date, count],
     queryFn: () => onlineSessionsApi.suggest(date),
-    enabled: enabled && date.length > 0,
+    enabled: count > 0 && date.length > 0,
+    gcTime: 0,
   });
 }
 
