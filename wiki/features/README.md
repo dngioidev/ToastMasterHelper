@@ -10,6 +10,7 @@ All product features for TM Scheduler.
 | [Online Session Scheduling](./online-session.md) | 3 | 📋 Planned | High |
 | [Offline Session Scheduling](./offline-session.md) | 4 | 📋 Planned | High |
 | [Dashboard & Analytics](./dashboard.md) | 5 | 📋 Planned | High |
+| [Tools — Export & Backup](./tools.md) | 6 | ✅ Done | Medium |
 
 ## Feature File Guide
 Each feature file contains:

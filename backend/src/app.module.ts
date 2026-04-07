@@ -9,6 +9,8 @@ import { MembersModule } from './modules/members/members.module';
 import { OnlineSessionsModule } from './modules/online-sessions/online-sessions.module';
 import { OfflineSessionsModule } from './modules/offline-sessions/offline-sessions.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ExportModule } from './modules/export/export.module';
+import { BackupModule } from './modules/backup/backup.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     OnlineSessionsModule,
     OfflineSessionsModule,
     DashboardModule,
+    ExportModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

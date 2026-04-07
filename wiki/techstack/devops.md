@@ -50,6 +50,29 @@ cp .env.example .env
 | Backend | 3000 | 3000 |
 | Frontend (nginx) | 80 | 80 |
 | PostgreSQL | 5432 | 5432 (dev only) |
+| pgAdmin 4 | 80 | 5050 |
+
+## pgAdmin 4 (Postgres UI)
+Access the database browser at **http://localhost:5050** after starting containers.
+
+**Login credentials** (from `.env`):
+- Email: `PGADMIN_EMAIL` (default: `admin@example.com`)
+- Password: `PGADMIN_PASSWORD` (default: `pgadmin`)
+
+pgAdmin runs in **Desktop mode** (`PGADMIN_CONFIG_SERVER_MODE=False`) — no server-side login screen, just the browser UI.
+
+**Add a server connection** (first time only):
+1. Click **Add New Server** on the dashboard
+2. **General** tab → Name: `tm-scheduler`
+3. **Connection** tab:
+   - Host: `postgres`
+   - Port: `5432`
+   - Maintenance database: `tm_scheduler`
+   - Username: `tm_user` (your `DB_USER`)
+   - Password: value of `DB_PASSWORD` in `.env`
+4. Click **Save** — the database tree appears on the left
+
+Data is persisted in the `pgadmin_data` Docker volume so the server connection survives restarts.
 
 ## Environment Variables
 See `.env.example` for all required variables. Key ones:

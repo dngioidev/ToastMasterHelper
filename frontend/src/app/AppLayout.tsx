@@ -6,6 +6,7 @@ const navItems = [
   { to: '/members', label: 'Members', icon: '👥' },
   { to: '/sessions/online', label: 'Online Sessions', icon: '💻' },
   { to: '/sessions/offline', label: 'Offline Sessions', icon: '🎤' },
+  { to: '/tools', label: 'Tools', icon: '🛠️' },
 ];
 
 export function AppLayout() {

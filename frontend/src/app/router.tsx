@@ -6,6 +6,7 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { MembersPage } from '../features/members/MembersPage';
 import { OnlineSessionsPage } from '../features/online-sessions/OnlineSessionsPage';
 import { OfflineSessionsPage } from '../features/offline-sessions/OfflineSessionsPage';
+import { ToolsPage } from '../features/tools/ToolsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -28,6 +29,7 @@ export function AppRouter() {
         <Route path="/members" element={<MembersPage />} />
         <Route path="/sessions/online" element={<OnlineSessionsPage />} />
         <Route path="/sessions/offline" element={<OfflineSessionsPage />} />
+        <Route path="/tools" element={<ToolsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
