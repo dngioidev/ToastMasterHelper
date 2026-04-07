@@ -249,7 +249,7 @@ export class ExportService {
           const name = hit.member.name;
           rowData[s.id] =
             rd.role === OfflineRole.SPEAKER
-              ? `${name} (P${hit.member.project_level})`
+              ? `${name} (P${hit.member.project_level + 1})`
               : name;
         } else {
           rowData[s.id] = '';

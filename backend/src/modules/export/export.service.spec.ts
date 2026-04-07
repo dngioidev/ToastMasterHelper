@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import * as ExcelJS from 'exceljs';
 import { ExportService } from './export.service';
 import { OnlineSession } from '../online-sessions/online-session.entity';
 import { OfflineSession } from '../offline-sessions/offline-session.entity';
+import { OfflineRole } from '../offline-sessions/offline-session-assignment.entity';
 import { Member, MemberStatus } from '../members/member.entity';
 
 const makeRepo = (data: unknown[] = []) => ({
@@ -82,6 +84,53 @@ describe('ExportService', () => {
       const buf = await service.exportFull();
       expect(buf).toBeInstanceOf(Buffer);
       expect(buf.byteLength).toBeGreaterThan(0);
+    });
+  });
+
+  describe('speaker project level label', () => {
+    it('shows P(level+1) for speakers in offline sheet', async () => {
+      const speaker = mockMember('Carol') as Member;
+      speaker.project_level = 3;
+
+      const sessionWithSpeaker: Partial<OfflineSession> = {
+        id: 'sess-1',
+        date: '2026-01-22',
+        num_speakers: 1,
+        num_backup_speakers: 0,
+        is_cancelled: false,
+        notes: null,
+        assignments: [
+          { id: 'a1', role: OfflineRole.SPEAKER, slot_index: 0, member: speaker } as any,
+        ],
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          ExportService,
+          { provide: getRepositoryToken(OnlineSession), useValue: makeRepo([]) },
+          { provide: getRepositoryToken(OfflineSession), useValue: makeRepo([sessionWithSpeaker]) },
+          { provide: getRepositoryToken(Member), useValue: makeRepo([speaker]) },
+        ],
+      }).compile();
+
+      const svc = module.get<ExportService>(ExportService);
+      const buf = await svc.exportSessions('2026-01-01', '2026-01-31');
+
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ArrayBuffer);
+      const ws = wb.getWorksheet('Offline Sessions')!;
+
+      // Row 2 = Speaker 1 (index per ROLE_DEFS: no=3)
+      let found = false;
+      ws.eachRow((row) => {
+        row.eachCell((cell) => {
+          if (typeof cell.value === 'string' && cell.value.includes('Carol')) {
+            expect(cell.value).toBe('Carol (P4)');
+            found = true;
+          }
+        });
+      });
+      expect(found).toBe(true);
     });
   });
 
