@@ -244,7 +244,15 @@ export class ExportService {
         const hit = s.assignments.find(
           (a) => a.role === rd.role && a.slot_index === rd.slot,
         );
-        rowData[s.id] = hit?.member?.name ?? '';
+        if (hit?.member) {
+          const name = hit.member.name;
+          rowData[s.id] =
+            rd.role === OfflineRole.SPEAKER
+              ? `${name} (P${hit.member.project_level})`
+              : name;
+        } else {
+          rowData[s.id] = '';
+        }
       }
 
       const row = ws.addRow(rowData);
