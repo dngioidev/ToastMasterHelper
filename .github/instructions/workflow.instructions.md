@@ -20,9 +20,12 @@ Every task — regardless of which agent handles it — MUST complete ALL applic
 
 ### Documentation (Wiki Sync)
 - [ ] Relevant `wiki/features/<feature>.md` updated
+- [ ] `wiki/business-workflow/<feature>.md` display rules verified against actual UI
 - [ ] `wiki/plan/roadmap.md` updated if feature status changed
 - [ ] `wiki/history/changelog.md` entry added (dated)
 - [ ] `wiki/techstack/` updated if tech decision was made
+
+> **UI Display Rule**: Any change to how member names, roles, or sessions are displayed in the frontend MUST be reflected in the matching `wiki/business-workflow/` section before the task is considered done.
 
 ### Bugs
 - [ ] Any build or test failures logged in `wiki/bugs/active-bugs.md` before fixing

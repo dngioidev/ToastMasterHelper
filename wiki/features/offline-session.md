@@ -38,9 +38,11 @@ Offline TM sessions have a structured role matrix (10+ roles) with specific elig
 ## Design Decisions
 | Decision | Chosen | Reason |
 |----------|--------|--------|
-| Speaker display | `Speaker 1 (P3)` | Shows project stage next to speaker name |
-| Passed indicator | ✅ green chip | Immediately visible in timetable |
-| Role assignment form | Inline dropdowns in table | Efficient for organisers |
+| Speaker display | `Speaker 1 (P3)` — P = project stage (level+1) | Shows which project stage they present at, not raw level index |
+| Evaluator display | Plain name only | Evaluator level is enforced at suggestion time; no need to show in timetable |
+| Passed indicator | `(Passed)` green text inline | Immediately visible in timetable cell |
+| Timetable layout | Rows = Roles, Columns = Session Dates (horizontal scroll) | Cross-session comparison at a glance; roles ordered by agenda sequence |
+| Backup rows | Below dashed separator, labeled "Backup Speaker", no sequence number | Visually separate from main agenda |
 
 ## Technical Notes
 - Entity: `offline_sessions` with configurable `num_speakers`

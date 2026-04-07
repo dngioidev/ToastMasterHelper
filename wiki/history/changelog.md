@@ -4,6 +4,30 @@ All notable changes to TM Scheduler, newest first.
 
 ---
 
+## [2026-04-07] — Display Refinements
+**Agent**: Copilot (main)
+**Scope**: Frontend, Wiki
+
+### Changed
+- **Online Sessions**: Removed `(Lv.X)` from speaker names — level is offline-only notation
+- **Offline Sessions**: Replaced card-grid layout with full **role × date timetable** (horizontal scroll)
+  - Rows ordered by agenda sequence: Toast Master → Table Tonic → Speaker/Evaluator pairs → Topic Master → Uh/Ah Counter → Timer → GE → (separator) → Backup Speakers
+  - Speaker cells now show `(P{level+1})` project-stage notation (e.g. `Alice (P3)`)
+  - Evaluator cells show plain name (no level)
+  - Backup Speaker rows appear below a dashed separator; labeled "Bk" in No. column
+  - Sessions with fewer speakers/backups than the maximum show `n/a` for out-of-scope slots
+- **Offline Suggestion panel**: Updated speaker preview to `(P{level+1})` format; removed level from evaluator preview
+- **Member session flags**: Split `attends_online` into two independent booleans: `online_as_chairman` and `online_as_speaker`
+  - Online suggest() now pulls chairman candidates and speaker candidates from separate pools
+  - Member form shows separate checkboxes per role type
+
+### Wiki
+- `wiki/business-workflow/online-session.md`: Added explicit note that level is NOT shown for online speakers
+- `wiki/features/offline-session.md`: Updated design decisions to reflect timetable layout and P-notation
+- `workflow.instructions.md`: Added UI Display Rule — any display change must sync wiki/business-workflow/
+
+---
+
 ## [2026-04-08] — Phases 2–5: Core Feature Implementation
 **Agent**: Copilot (main)
 **Scope**: Backend, Frontend

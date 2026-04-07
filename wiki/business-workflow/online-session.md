@@ -52,6 +52,8 @@ Speaker 1: Charlie
 Speaker 2: Diana
 ```
 
+> **Note**: Speaker names in online sessions are shown WITHOUT project level. Level notation is offline-only.
+
 ## Notes
 - Sessions can have free-form `notes` attached to a date
 - If a session has to be skipped, it can be marked as cancelled

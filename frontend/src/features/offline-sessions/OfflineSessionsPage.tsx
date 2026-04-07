@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import dayjs from 'dayjs';
 import {
   useOfflineSessions,
@@ -6,13 +6,11 @@ import {
   useDeleteOfflineSession,
   useOfflineSessionSuggest,
 } from './useOfflineSessions';
-import {
-  OfflineRole,
-  OFFLINE_ROLE_LABELS,
-} from './offlineSession.types';
+import { OfflineRole } from './offlineSession.types';
 import type {
   AssignmentPayload,
   OfflineSession,
+  OfflineSessionAssignment,
   OfflineSuggestResult,
 } from './offlineSession.types';
 import type { Member } from '../members/member.types';
@@ -42,6 +40,78 @@ function buildAssignmentsFromSuggestion(
     addOne(b, OfflineRole.BACKUP_SPEAKER, i),
   );
   return assignments;
+}
+
+// ─── Timetable helpers ────────────────────────────────────────────────────────
+
+const ROLE_TIME: Partial<Record<OfflineRole, string>> = {
+  [OfflineRole.TOAST_MASTER]: '2',
+  [OfflineRole.TABLE_TONIC]: '—',
+  [OfflineRole.SPEAKER]: '10',
+  [OfflineRole.EVALUATOR]: '3',
+  [OfflineRole.TOPIC_MASTER]: '15',
+  [OfflineRole.UH_AH_COUNTER]: '1',
+  [OfflineRole.TIMER]: '1',
+  [OfflineRole.GENERAL_EVALUATOR]: '5',
+  [OfflineRole.BACKUP_SPEAKER]: '—',
+};
+
+interface RowDef {
+  no: number | null;
+  label: string;
+  role: OfflineRole;
+  slot: number;
+  isBackup: boolean;
+}
+
+function buildRows(maxSpeakers: number, maxBackup: number): RowDef[] {
+  const rows: RowDef[] = [];
+  let no = 1;
+  rows.push({ no: no++, label: 'Toast Master', role: OfflineRole.TOAST_MASTER, slot: 0, isBackup: false });
+  rows.push({ no: no++, label: 'Table Tonic', role: OfflineRole.TABLE_TONIC, slot: 0, isBackup: false });
+  for (let i = 0; i < maxSpeakers; i++) {
+    rows.push({ no: no++, label: `Speaker ${i + 1}`, role: OfflineRole.SPEAKER, slot: i, isBackup: false });
+    rows.push({ no: no++, label: `Evaluator ${i + 1}`, role: OfflineRole.EVALUATOR, slot: i, isBackup: false });
+  }
+  rows.push({ no: no++, label: 'Topic Master', role: OfflineRole.TOPIC_MASTER, slot: 0, isBackup: false });
+  rows.push({ no: no++, label: 'Uh/Ah Counter', role: OfflineRole.UH_AH_COUNTER, slot: 0, isBackup: false });
+  rows.push({ no: no++, label: 'Timer', role: OfflineRole.TIMER, slot: 0, isBackup: false });
+  rows.push({ no: no++, label: 'GE', role: OfflineRole.GENERAL_EVALUATOR, slot: 0, isBackup: false });
+  for (let i = 0; i < maxBackup; i++) {
+    rows.push({ no: null, label: 'Backup Speaker', role: OfflineRole.BACKUP_SPEAKER, slot: i, isBackup: true });
+  }
+  return rows;
+}
+
+function getAssignment(
+  session: OfflineSession,
+  role: OfflineRole,
+  slot: number,
+): OfflineSessionAssignment | null {
+  return session.assignments.find((a) => a.role === role && a.slot_index === slot) ?? null;
+}
+
+function CellContent({
+  assignment,
+  role,
+}: {
+  assignment: OfflineSessionAssignment | null;
+  role: OfflineRole;
+}) {
+  if (!assignment?.member) return <span className="text-gray-400">—</span>;
+  const { name, project_level } = assignment.member;
+  if (role === OfflineRole.SPEAKER || role === OfflineRole.BACKUP_SPEAKER) {
+    return (
+      <span>
+        {name}{' '}
+        <span className="text-blue-600 font-medium">(P{(project_level ?? 0) + 1})</span>
+        {assignment.passed && (
+          <span className="text-green-600 ml-1">(Passed)</span>
+        )}
+      </span>
+    );
+  }
+  return <span>{name}</span>;
 }
 
 interface CreateSessionFormProps {
@@ -146,11 +216,11 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
               ['Table Tonic', suggestion.table_tonic?.name],
               ...suggestion.speakers.map((s, i) => [
                 `Speaker ${i + 1}`,
-                s ? `${s.name} (Lv.${s.project_level})` : '—',
+                s ? `${s.name} (P${s.project_level + 1})` : '—',
               ]),
               ...suggestion.evaluators.map((e, i) => [
                 `Evaluator ${i + 1}`,
-                e ? `${e.name} (Lv.${e.project_level})` : 'No eligible evaluator',
+                e?.name ?? 'No eligible evaluator',
               ]),
               ['Topic Master', suggestion.topic_master?.name],
               ['Uh/Ah Counter', suggestion.uh_ah_counter?.name],
@@ -158,7 +228,7 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
               ['General Evaluator', suggestion.general_evaluator?.name],
               ...suggestion.backup_speakers.map((b, i) => [
                 `Backup Speaker ${i + 1}`,
-                b ? `${b.name} (Lv.${b.project_level})` : '—',
+                b ? `${b.name} (P${b.project_level + 1})` : '—',
               ]),
             ].map(([label, value]) => (
               <div key={label as string} className="flex justify-between">
@@ -189,52 +259,6 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
   );
 }
 
-function AssignmentsList({ session }: { session: OfflineSession }) {
-  const byRole = session.assignments.reduce<
-    Record<string, typeof session.assignments>
-  >((acc, a) => {
-    const key = a.role;
-    acc[key] = acc[key] ?? [];
-    acc[key].push(a);
-    return acc;
-  }, {});
-
-  const roleOrder: OfflineRole[] = [
-    OfflineRole.TOAST_MASTER,
-    OfflineRole.TABLE_TONIC,
-    OfflineRole.SPEAKER,
-    OfflineRole.EVALUATOR,
-    OfflineRole.TOPIC_MASTER,
-    OfflineRole.UH_AH_COUNTER,
-    OfflineRole.TIMER,
-    OfflineRole.GENERAL_EVALUATOR,
-    OfflineRole.BACKUP_SPEAKER,
-  ];
-
-  return (
-    <div className="mt-2 space-y-1 text-xs text-gray-600">
-      {roleOrder.map((role) => {
-        const slots = byRole[role];
-        if (!slots?.length) return null;
-        return slots.map((a, i) => (
-          <div key={a.id} className="flex justify-between">
-            <span className="text-gray-400">
-              {OFFLINE_ROLE_LABELS[role]}
-              {slots.length > 1 ? ` ${i + 1}` : ''}
-            </span>
-            <span>
-              {a.member?.name ?? '—'}
-              {a.role === OfflineRole.SPEAKER && a.passed && (
-                <span className="ml-1 text-green-600">(Passed)</span>
-              )}
-            </span>
-          </div>
-        ));
-      })}
-    </div>
-  );
-}
-
 export function OfflineSessionsPage() {
   const { data: sessions, isLoading, error } = useOfflineSessions();
   const deleteSession = useDeleteOfflineSession();
@@ -246,13 +270,22 @@ export function OfflineSessionsPage() {
     }
   };
 
+  const sortedSessions = [...(sessions ?? [])].sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
+  const maxSpeakers = sortedSessions.length
+    ? Math.max(...sortedSessions.map((s) => s.num_speakers))
+    : 2;
+  const maxBackup = sortedSessions.length
+    ? Math.max(...sortedSessions.map((s) => s.num_backup_speakers))
+    : 1;
+  const rows = buildRows(maxSpeakers, maxBackup);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Offline Sessions
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Offline Sessions</h1>
           <p className="text-sm text-gray-500 mt-1">
             In-person ToastMasters sessions
           </p>
@@ -272,44 +305,109 @@ export function OfflineSessionsPage() {
         </p>
       )}
 
-      {!isLoading && !error && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sessions?.length === 0 && (
-            <p className="text-gray-400 text-sm col-span-3 py-8 text-center">
-              No offline sessions yet. Create the first one!
-            </p>
-          )}
-          {sessions?.map((session: OfflineSession) => (
-            <div
-              key={session.id}
-              className="bg-white rounded-xl border border-gray-200 p-4"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {dayjs(session.date).format('MMM D, YYYY')}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {session.num_speakers} speaker
-                    {session.num_speakers > 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {session.is_cancelled && (
-                    <span className="text-red-500 text-xs">Cancelled</span>
-                  )}
-                  <button
-                    onClick={() => handleDelete(session.id)}
-                    aria-label="Delete session"
-                    className="text-gray-400 hover:text-red-500 text-xs"
+      {!isLoading && !error && sortedSessions.length === 0 && (
+        <p className="text-gray-400 text-sm py-8 text-center">
+          No offline sessions yet. Create the first one!
+        </p>
+      )}
+
+      {!isLoading && !error && sortedSessions.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-center px-3 py-3 font-medium text-gray-500 w-10">
+                  No.
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 min-w-[140px]">
+                  Role
+                </th>
+                <th className="text-center px-3 py-3 font-medium text-gray-500 w-16">
+                  Time
+                </th>
+                {sortedSessions.map((s) => (
+                  <th
+                    key={s.id}
+                    className="text-center px-4 py-3 font-medium text-gray-700 min-w-[160px]"
                   >
-                    ✕
-                  </button>
-                </div>
-              </div>
-              <AssignmentsList session={session} />
-            </div>
-          ))}
+                    <div className="flex flex-col items-center gap-1">
+                      <span>{dayjs(s.date).format('MMM D, YYYY')}</span>
+                      {s.is_cancelled && (
+                        <span className="text-red-500 text-xs font-normal">
+                          Cancelled
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        className="text-gray-300 hover:text-red-500 text-xs font-normal transition-colors"
+                        aria-label={`Delete session ${dayjs(s.date).format('MMM D, YYYY')}`}
+                      >
+                        ✕ Delete
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((row, idx) => {
+                const showSeparator = row.isBackup && !rows[idx - 1]?.isBackup;
+                return (
+                  <Fragment key={`${row.role}-${row.slot}`}>
+                    {showSeparator && (
+                      <tr>
+                        <td colSpan={3 + sortedSessions.length} className="p-0">
+                          <div className="border-t-2 border-dashed border-gray-300 mx-2" />
+                        </td>
+                      </tr>
+                    )}
+                    <tr
+                      className={
+                        row.isBackup
+                          ? 'bg-gray-50/70'
+                          : 'hover:bg-blue-50/30 transition-colors'
+                      }
+                    >
+                      <td className="px-3 py-2.5 text-center text-gray-400 font-mono text-xs">
+                        {row.no ?? (
+                          <span className="italic text-gray-300">Bk</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 font-medium text-gray-700">
+                        {row.label}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
+                        {ROLE_TIME[row.role]}
+                      </td>
+                      {sortedSessions.map((s) => {
+                        const outOfScope =
+                          ((row.role === OfflineRole.SPEAKER ||
+                            row.role === OfflineRole.EVALUATOR) &&
+                            row.slot >= s.num_speakers) ||
+                          (row.role === OfflineRole.BACKUP_SPEAKER &&
+                            row.slot >= s.num_backup_speakers);
+                        const assignment = getAssignment(s, row.role, row.slot);
+                        return (
+                          <td
+                            key={s.id}
+                            className={`px-4 py-2.5 text-center ${
+                              outOfScope ? 'bg-gray-50 text-gray-300 text-xs' : 'text-gray-700'
+                            }`}
+                          >
+                            {outOfScope ? (
+                              'n/a'
+                            ) : (
+                              <CellContent assignment={assignment} role={row.role} />
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -317,3 +415,4 @@ export function OfflineSessionsPage() {
     </div>
   );
 }
+

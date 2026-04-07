@@ -93,17 +93,13 @@ function CreateSessionForm({ onClose }: CreateSessionFormProps) {
             <div className="flex justify-between">
               <span className="text-gray-500">Speaker 1</span>
               <span className="font-medium">
-                {suggestion.speaker1
-                  ? `${suggestion.speaker1.name} (Lv.${suggestion.speaker1.project_level})`
-                  : '—'}
+                {suggestion.speaker1?.name ?? '—'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Speaker 2</span>
               <span className="font-medium">
-                {suggestion.speaker2
-                  ? `${suggestion.speaker2.name} (Lv.${suggestion.speaker2.project_level})`
-                  : '—'}
+                {suggestion.speaker2?.name ?? '—'}
               </span>
             </div>
           </div>
@@ -213,14 +209,10 @@ export function OnlineSessionsPage() {
                     {session.sub_chairman?.name ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {session.speaker1
-                      ? `${session.speaker1.name} (Lv.${session.speaker1.project_level})`
-                      : '—'}
+                    {session.speaker1?.name ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {session.speaker2
-                      ? `${session.speaker2.name} (Lv.${session.speaker2.project_level})`
-                      : '—'}
+                    {session.speaker2?.name ?? '—'}
                   </td>
                   <td className="px-4 py-3">
                     {session.is_cancelled ? (
