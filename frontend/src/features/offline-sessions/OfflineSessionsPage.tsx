@@ -9,6 +9,7 @@ import {
 } from './useOfflineSessions';
 import { useMembers } from '../members/useMembers';
 import { OfflineRole } from './offlineSession.types';
+import { MemberStatus } from '../members/member.types';
 import type {
   OfflineSession,
   OfflineSessionAssignment,
@@ -154,6 +155,9 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
 
   const { data: membersPage } = useMembers();
   const members = membersPage?.data ?? [];
+  const offlineMembers = members.filter(
+    (m) => m.status === MemberStatus.ACTIVE && m.attends_offline,
+  );
 
   const { data: suggestion, isLoading: isSuggesting } = useOfflineSessionSuggest(
     numSpeakers,
@@ -294,7 +298,7 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
                     id={`role-${key}`}
                     value={roleMap[key] ?? ''}
                     onChange={(v) => setRole(row.role, row.slot, v)}
-                    members={members}
+                    members={offlineMembers}
                   />
                 </div>
                 {(row.role === OfflineRole.SPEAKER || row.role === OfflineRole.BACKUP_SPEAKER) && (

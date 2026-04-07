@@ -9,6 +9,7 @@ import {
 } from './useOnlineSessions';
 import { useMembers } from '../members/useMembers';
 import type { OnlineSession, CreateOnlineSessionPayload, UpdateOnlineSessionPayload } from './onlineSession.types';
+import { MemberStatus } from '../members/member.types';
 import type { Member } from '../members/member.types';
 
 function getNextWednesday(): string {
@@ -69,6 +70,12 @@ function SessionForm({ session, onClose }: SessionFormProps) {
 
   const { data: membersPage } = useMembers();
   const members = membersPage?.data ?? [];
+  const chairmenMembers = members.filter(
+    (m) => m.status === MemberStatus.ACTIVE && m.online_as_chairman,
+  );
+  const speakersMembers = members.filter(
+    (m) => m.status === MemberStatus.ACTIVE && m.online_as_speaker,
+  );
 
   const { data: suggestion, isLoading: isSuggesting } = useOnlineSessionSuggest(
     date,
@@ -121,11 +128,11 @@ function SessionForm({ session, onClose }: SessionFormProps) {
   };
 
   const ROLE_FIELDS = [
-    { label: 'Main Chairman', value: mainChairmanId, setter: setMainChairmanId, inputId: 'main-chairman' },
-    { label: 'Sub Chairman', value: subChairmanId, setter: setSubChairmanId, inputId: 'sub-chairman' },
-    { label: 'Speaker 1', value: speaker1Id, setter: setSpeaker1Id, inputId: 'speaker-1' },
-    { label: 'Speaker 2', value: speaker2Id, setter: setSpeaker2Id, inputId: 'speaker-2' },
-  ] as const;
+    { label: 'Main Chairman', value: mainChairmanId, setter: setMainChairmanId, inputId: 'main-chairman', memberList: chairmenMembers },
+    { label: 'Sub Chairman', value: subChairmanId, setter: setSubChairmanId, inputId: 'sub-chairman', memberList: chairmenMembers },
+    { label: 'Speaker 1', value: speaker1Id, setter: setSpeaker1Id, inputId: 'speaker-1', memberList: speakersMembers },
+    { label: 'Speaker 2', value: speaker2Id, setter: setSpeaker2Id, inputId: 'speaker-2', memberList: speakersMembers },
+  ];
 
   return (
     <div
@@ -164,7 +171,7 @@ function SessionForm({ session, onClose }: SessionFormProps) {
 
         {/* Role dropdowns */}
         <div className="space-y-3">
-          {ROLE_FIELDS.map(({ label, value, setter, inputId }) => (
+          {ROLE_FIELDS.map(({ label, value, setter, inputId, memberList }) => (
             <div key={inputId}>
               <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
                 {label}
@@ -173,7 +180,7 @@ function SessionForm({ session, onClose }: SessionFormProps) {
                 id={inputId}
                 value={value}
                 onChange={setter}
-                members={members}
+                members={memberList}
               />
             </div>
           ))}
