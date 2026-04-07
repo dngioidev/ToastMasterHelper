@@ -91,8 +91,8 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql://tm_user:ci_release_password_change_me@localhost:5432/tm_scheduler
-          NODE_ENV: production
         run: |
+          # Install ALL deps (including devDeps) so @nestjs/cli is available
           npm ci
           npm run build
           npm run migration:run
