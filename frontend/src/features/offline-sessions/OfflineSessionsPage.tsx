@@ -158,6 +158,7 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
   const offlineMembers = members.filter(
     (m) => m.status === MemberStatus.ACTIVE && m.attends_offline,
   );
+  const offlineSpeakerMembers = offlineMembers.filter((m) => m.project_level < 10);
 
   const { data: suggestion, isLoading: isSuggesting } = useOfflineSessionSuggest(
     numSpeakers,
@@ -298,7 +299,11 @@ function OfflineSessionForm({ session, onClose }: OfflineSessionFormProps) {
                     id={`role-${key}`}
                     value={roleMap[key] ?? ''}
                     onChange={(v) => setRole(row.role, row.slot, v)}
-                    members={offlineMembers}
+                    members={
+                      row.role === OfflineRole.SPEAKER || row.role === OfflineRole.BACKUP_SPEAKER
+                        ? offlineSpeakerMembers
+                        : offlineMembers
+                    }
                   />
                 </div>
                 {(row.role === OfflineRole.SPEAKER || row.role === OfflineRole.BACKUP_SPEAKER) && (

@@ -31,7 +31,10 @@ export function useCreateOfflineSession() {
   return useMutation({
     mutationFn: (payload: CreateOfflineSessionPayload) =>
       offlineSessionsApi.create(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['offline-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offline-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -45,7 +48,10 @@ export function useUpdateOfflineSession() {
       id: string;
       payload: UpdateOfflineSessionPayload;
     }) => offlineSessionsApi.update(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['offline-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offline-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -53,6 +59,9 @@ export function useDeleteOfflineSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => offlineSessionsApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['offline-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offline-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }

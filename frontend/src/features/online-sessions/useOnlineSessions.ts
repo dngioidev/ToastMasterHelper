@@ -26,7 +26,10 @@ export function useCreateOnlineSession() {
   return useMutation({
     mutationFn: (payload: CreateOnlineSessionPayload) =>
       onlineSessionsApi.create(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['online-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['online-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -40,7 +43,10 @@ export function useUpdateOnlineSession() {
       id: string;
       payload: UpdateOnlineSessionPayload;
     }) => onlineSessionsApi.update(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['online-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['online-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -48,6 +54,9 @@ export function useDeleteOnlineSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => onlineSessionsApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['online-sessions'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['online-sessions'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
