@@ -1,0 +1,209 @@
+name: Release
+
+# Trigger on any tag pushed that starts with "v" (e.g. v1.0.0, v2.3.1)
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # required to create a GitHub Release and upload assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    # ─── Postgres service for running migrations and dumping the schema ──────
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: tm_scheduler
+          POSTGRES_USER: tm_user
+          POSTGRES_PASSWORD: ci_release_password_change_me
+        options: >-
+          --health-cmd "pg_isready -U tm_user -d tm_scheduler"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Determine version from the pushed tag ─────────────────────────────
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building release $VERSION"
+
+      # ── 3. Set up Docker Buildx ───────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 4. Build application images ──────────────────────────────────────────
+      - name: Build backend image
+        run: |
+          docker build \
+            --file docker/backend.dockerfile \
+            --tag "tm-scheduler-backend:${{ steps.version.outputs.VERSION }}" \
+            ./backend
+
+      - name: Build frontend image
+        # Context is repo root because frontend.dockerfile copies from ./frontend/
+        run: |
+          docker build \
+            --file docker/frontend.dockerfile \
+            --tag "tm-scheduler-frontend:${{ steps.version.outputs.VERSION }}" \
+            .
+
+      # ── 5. Pull third-party images so they are included in the offline tar ───
+      - name: Pull infrastructure images
+        run: |
+          docker pull postgres:16-alpine
+          docker pull dpage/pgadmin4:latest
+
+      # ── 6. Install PostgreSQL 16 client (pg_dump must match server version) ──
+      - name: Install PostgreSQL 16 client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gnupg curl lsb-release
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      # ── 7. Run migrations to build the canonical schema ──────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://tm_user:ci_release_password_change_me@localhost:5432/tm_scheduler
+          NODE_ENV: production
+        run: |
+          npm ci
+          npm run build
+          npm run migration:run
+
+      # ── 8. Dump the fully-migrated database (schema + migration records) ─────
+      #       This dump is included in the package so a fresh install starts
+      #       with all tables already created and no migrations to replay.
+      - name: Dump database
+        env:
+          PGPASSWORD: ci_release_password_change_me
+        run: |
+          pg_dump \
+            --host localhost \
+            --port 5432 \
+            --username tm_user \
+            --dbname tm_scheduler \
+            --no-owner \
+            --no-acl \
+            --file db-dump.sql
+          echo "Dump size: $(wc -c < db-dump.sql) bytes"
+
+      # ── 9. Generate the release docker-compose.yml from the template ─────────
+      - name: Generate release docker-compose.yml
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          sed \
+            -e "s|BACKEND_IMAGE_PLACEHOLDER|tm-scheduler-backend:${VERSION}|g" \
+            -e "s|FRONTEND_IMAGE_PLACEHOLDER|tm-scheduler-frontend:${VERSION}|g" \
+            docker/docker-compose.release.tmpl \
+            > docker-compose.release.yml
+          echo "Generated docker-compose.yml:"
+          cat docker-compose.release.yml
+
+      # ── 10. Save all four images into one tar (offline delivery) ─────────────
+      - name: Save all Docker images to tar
+        run: |
+          docker save \
+            "tm-scheduler-backend:${{ steps.version.outputs.VERSION }}" \
+            "tm-scheduler-frontend:${{ steps.version.outputs.VERSION }}" \
+            postgres:16-alpine \
+            dpage/pgadmin4:latest \
+            --output all-images.tar
+          echo "Tar size: $(du -sh all-images.tar | cut -f1)"
+
+      # ── 11. Assemble the portable release package ────────────────────────────
+      - name: Create release package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          PACKAGE_NAME="tm-scheduler-${VERSION}"
+          mkdir -p "${PACKAGE_NAME}"
+
+          cp docker-compose.release.yml   "${PACKAGE_NAME}/docker-compose.yml"
+          cp .env.example                 "${PACKAGE_NAME}/.env"
+          cp all-images.tar               "${PACKAGE_NAME}/all-images.tar"
+          cp db-dump.sql                  "${PACKAGE_NAME}/db-dump.sql"
+          cp scripts/install.sh           "${PACKAGE_NAME}/install.sh"
+          cp scripts/uninstall.sh         "${PACKAGE_NAME}/uninstall.sh"
+          cp scripts/release-README.md    "${PACKAGE_NAME}/README.md"
+
+          chmod +x "${PACKAGE_NAME}/install.sh" "${PACKAGE_NAME}/uninstall.sh"
+
+          tar -czf "${PACKAGE_NAME}.tar.gz" "${PACKAGE_NAME}/"
+          echo "PACKAGE_FILE=${PACKAGE_NAME}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "Package created:"
+          ls -lh "${PACKAGE_NAME}.tar.gz"
+
+      # ── 12. Publish the GitHub Release with the package attached ─────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: "TM Scheduler ${{ steps.version.outputs.VERSION }}"
+          generate_release_notes: true
+          body: |
+            ## TM Scheduler ${{ steps.version.outputs.VERSION }}
+
+            ### Quick Install (offline, no internet required on target server)
+
+            ```bash
+            # 1. Download the package
+            wget https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/tm-scheduler-${{ steps.version.outputs.VERSION }}.tar.gz
+
+            # 2. Extract
+            tar -xzf tm-scheduler-${{ steps.version.outputs.VERSION }}.tar.gz
+            cd tm-scheduler-${{ steps.version.outputs.VERSION }}
+
+            # 3. Configure environment
+            nano .env          # set DB_PASSWORD, JWT_SECRET, ADMIN_PASSWORD_HASH, CORS_ORIGIN
+
+            # 4. Install
+            bash install.sh
+            ```
+
+            ### What's included in the package
+            | File | Description |
+            |------|-------------|
+            | `docker-compose.yml` | Production Compose config (image references, no build needed) |
+            | `.env` | Environment template — **must be edited before install** |
+            | `all-images.tar` | All 4 Docker images pre-bundled (backend, frontend, postgres, pgadmin) |
+            | `db-dump.sql` | Database schema dump (tables + migration records) |
+            | `install.sh` | One-shot installer |
+            | `uninstall.sh` | Graceful uninstaller |
+            | `README.md` | Full install guide |
+
+            ### Requirements
+            - Docker Engine ≥ 24.0
+            - Docker Compose Plugin ≥ 2.20
+            - ~2 GB free disk space
+          files: ${{ steps.package.outputs.PACKAGE_FILE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
