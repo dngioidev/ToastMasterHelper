@@ -136,6 +136,24 @@ describe('OnlineSessionsService', () => {
       expect(speakerIds.some((id) => ['bob', 'charlie', 'diana'].includes(id ?? ''))).toBe(true);
     });
 
+    it('should fall back to ignoring 14-day window when speaker pool is exhausted', async () => {
+      const alice = makeMember({ id: 'alice', name: 'Alice', project_level: 3, role_counts: { speaker: 1 } });
+      const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 4, role_counts: { speaker: 2 } });
+      membersService.findOnlineChairmen.mockResolvedValue([]);
+      membersService.findOnlineSpeakers.mockResolvedValue([alice, bob]);
+      // All speakers were recent — window sessions cover alice and bob
+      repo.find
+        .mockResolvedValueOnce([]) // last 2 sessions (chairman exclusion)
+        .mockResolvedValueOnce([
+          { speaker1_id: 'alice', speaker2_id: 'bob' },
+        ]); // window sessions (speaker exclusion)
+      const result = await service.suggest('2026-04-15');
+      // fallback should still suggest both speakers
+      expect(result.speaker1).not.toBeNull();
+      expect(result.speaker2).not.toBeNull();
+      expect([result.speaker1?.id, result.speaker2?.id].sort()).toEqual(['alice', 'bob']);
+    });
+
     it('should not assign the same person as both chairman and speaker', async () => {
       const alice = makeMember({ id: 'alice', name: 'Alice', project_level: 3 });
       const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 5 });

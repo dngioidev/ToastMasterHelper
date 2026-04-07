@@ -169,19 +169,31 @@ export class OnlineSessionsService {
       [mainChairman?.id, subChairman?.id].filter(Boolean) as string[],
     );
 
-    const speakerCandidates = speakersPool
-      .filter(
-        (m) =>
-          m.project_level < 10 &&
-          !assignedIds.has(m.id) &&
-          !recentSpeakerIds.has(m.id),
-      )
-      .sort((a, b) => {
+    const sortBySpeakerCount = (members: Member[]) =>
+      [...members].sort((a, b) => {
         const aCount = a.role_counts?.['speaker'] ?? 0;
         const bCount = b.role_counts?.['speaker'] ?? 0;
         if (aCount !== bCount) return aCount - bCount;
         return a.name.localeCompare(b.name);
       });
+
+    let speakerCandidates = sortBySpeakerCount(
+      speakersPool.filter(
+        (m) =>
+          m.project_level < 10 &&
+          !assignedIds.has(m.id) &&
+          !recentSpeakerIds.has(m.id),
+      ),
+    );
+
+    // Fallback: if the 14-day window exhausts the pool, ignore recency constraint
+    if (speakerCandidates.length < 2) {
+      speakerCandidates = sortBySpeakerCount(
+        speakersPool.filter(
+          (m) => m.project_level < 10 && !assignedIds.has(m.id),
+        ),
+      );
+    }
 
     const speaker1 = speakerCandidates[0] ?? null;
     const speaker2 = speakerCandidates[1] ?? null;
