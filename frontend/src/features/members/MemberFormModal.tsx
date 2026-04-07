@@ -25,6 +25,9 @@ export function MemberFormModal({
       name: member?.name ?? '',
       status: member?.status ?? MemberStatus.ACTIVE,
       project_level: member?.project_level ?? 0,
+      online_as_chairman: member?.online_as_chairman ?? true,
+      online_as_speaker: member?.online_as_speaker ?? true,
+      attends_offline: member?.attends_offline ?? true,
     },
   });
 
@@ -102,6 +105,46 @@ export function MemberFormModal({
                 {errors.project_level.message}
               </p>
             )}
+          </div>
+
+          <div>
+            <p className="block text-sm font-medium text-gray-700 mb-2">
+              Session Participation
+            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Online (Wed 11:20)</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  {...register('online_as_chairman')}
+                />
+                <span className="text-sm text-gray-700">
+                  As <strong>Chairman</strong> (main / sub)
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  {...register('online_as_speaker')}
+                />
+                <span className="text-sm text-gray-700">
+                  As <strong>Speaker</strong>
+                </span>
+              </label>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mt-1">Offline (in-person)</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  {...register('attends_offline')}
+                />
+                <span className="text-sm text-gray-700">
+                  Joins <strong>Offline</strong> sessions
+                </span>
+              </label>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">

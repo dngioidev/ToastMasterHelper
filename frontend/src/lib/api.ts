@@ -17,7 +17,13 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap the global { data: T } envelope from TransformInterceptor
+    if (response.data && Object.prototype.hasOwnProperty.call(response.data, 'data')) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   (error: unknown) => {
     if (
       axios.isAxiosError(error) &&

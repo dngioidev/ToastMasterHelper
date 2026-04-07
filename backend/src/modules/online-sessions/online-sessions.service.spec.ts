@@ -12,6 +12,9 @@ const makeMember = (overrides: Partial<Member> = {}): Member => ({
   status: MemberStatus.ACTIVE,
   project_level: 3,
   role_counts: {},
+  online_as_chairman: true,
+  online_as_speaker: true,
+  attends_offline: true,
   created_at: new Date(),
   updated_at: new Date(),
   ...overrides,
@@ -26,7 +29,8 @@ const makeRepo = () => ({
 });
 
 const makeMembersService = () => ({
-  findActiveMembers: jest.fn(),
+  findOnlineChairmen: jest.fn(),
+  findOnlineSpeakers: jest.fn(),
   findEligibleSpeakers: jest.fn(),
   incrementRoleCount: jest.fn().mockResolvedValue(undefined),
   findOne: jest.fn(),
@@ -97,7 +101,8 @@ describe('OnlineSessionsService', () => {
       const alice = makeMember({ id: 'alice', name: 'Alice', role_counts: { main_chairman: 1 } });
       const bob = makeMember({ id: 'bob', name: 'Bob', role_counts: { main_chairman: 0 } });
       const charlie = makeMember({ id: 'charlie', name: 'Charlie', role_counts: {} });
-      membersService.findActiveMembers.mockResolvedValue([alice, bob, charlie]);
+      membersService.findOnlineChairmen.mockResolvedValue([alice, bob, charlie]);
+      membersService.findOnlineSpeakers.mockResolvedValue([alice, bob, charlie]);
       // Last 2 sessions had alice and bob as main chairmen
       repo.find.mockResolvedValue([
         { main_chairman_id: 'alice' },
@@ -112,7 +117,8 @@ describe('OnlineSessionsService', () => {
       const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 3 });
       const charlie = makeMember({ id: 'charlie', name: 'Charlie', project_level: 5 });
       const diana = makeMember({ id: 'diana', name: 'Diana', project_level: 2 });
-      membersService.findActiveMembers.mockResolvedValue([alice, bob, charlie, diana]);
+      membersService.findOnlineChairmen.mockResolvedValue([alice, bob, charlie, diana]);
+      membersService.findOnlineSpeakers.mockResolvedValue([alice, bob, charlie, diana]);
       repo.find.mockResolvedValue([]);
       const result = await service.suggest('2026-04-15');
       const speakerIds = [result.speaker1?.id, result.speaker2?.id];
@@ -124,7 +130,8 @@ describe('OnlineSessionsService', () => {
     it('should not assign the same person as both chairman and speaker', async () => {
       const alice = makeMember({ id: 'alice', name: 'Alice', project_level: 3 });
       const bob = makeMember({ id: 'bob', name: 'Bob', project_level: 5 });
-      membersService.findActiveMembers.mockResolvedValue([alice, bob]);
+      membersService.findOnlineChairmen.mockResolvedValue([alice, bob]);
+      membersService.findOnlineSpeakers.mockResolvedValue([alice, bob]);
       repo.find.mockResolvedValue([]);
       const result = await service.suggest('2026-04-15');
       const allAssigned = [

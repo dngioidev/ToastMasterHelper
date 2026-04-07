@@ -66,6 +66,27 @@ export class MembersService {
     });
   }
 
+  async findOnlineChairmen(): Promise<Member[]> {
+    return this.memberRepository.find({
+      where: { status: MemberStatus.ACTIVE, online_as_chairman: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  async findOnlineSpeakers(): Promise<Member[]> {
+    return this.memberRepository.find({
+      where: { status: MemberStatus.ACTIVE, online_as_speaker: true },
+      order: { name: 'ASC' },
+    });
+  }
+
+  async findOfflineMembers(): Promise<Member[]> {
+    return this.memberRepository.find({
+      where: { status: MemberStatus.ACTIVE, attends_offline: true },
+      order: { name: 'ASC' },
+    });
+  }
+
   async findEligibleSpeakers(): Promise<Member[]> {
     return this.memberRepository
       .createQueryBuilder('m')

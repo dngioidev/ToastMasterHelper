@@ -28,6 +28,15 @@ export class Member {
   @Column({ type: 'jsonb', default: {} })
   role_counts!: Record<string, number>;
 
+  @Column({ type: 'boolean', default: true })
+  online_as_chairman!: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  online_as_speaker!: boolean;
+
+  @Column({ type: 'boolean', default: true })
+  attends_offline!: boolean;
+
   @CreateDateColumn()
   created_at!: Date;
 

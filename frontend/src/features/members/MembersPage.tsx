@@ -114,6 +114,9 @@ export function MembersPage() {
                   Level
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">
+                  Sessions
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">
                   Speeches
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">
@@ -126,7 +129,7 @@ export function MembersPage() {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="text-center text-gray-400 py-8 text-sm"
                   >
                     No members found.
@@ -144,6 +147,33 @@ export function MembersPage() {
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
                       {member.project_level}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      title={`Online: ${member.online_as_chairman ? 'Chair' : ''}${member.online_as_chairman && member.online_as_speaker ? '+' : ''}${member.online_as_speaker ? 'Spk' : ''} | Offline: ${member.attends_offline ? 'Yes' : 'No'}`}
+                      className="flex gap-1 flex-wrap"
+                    >
+                      {member.online_as_chairman && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                          Chair
+                        </span>
+                      )}
+                      {member.online_as_speaker && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">
+                          Spk
+                        </span>
+                      )}
+                      {!member.online_as_chairman && !member.online_as_speaker && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">
+                          –
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded ${member.attends_offline ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400 line-through'}`}
+                      >
+                        Offline
+                      </span>
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600">

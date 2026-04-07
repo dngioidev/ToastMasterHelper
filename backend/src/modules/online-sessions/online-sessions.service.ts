@@ -85,7 +85,9 @@ export class OnlineSessionsService {
   }
 
   async suggest(date: string): Promise<SuggestResult> {
-    const activeMembers = await this.membersService.findActiveMembers();
+    // Separate pools: chairman-tagged members vs speaker-tagged members
+    const chairmenPool = await this.membersService.findOnlineChairmen();
+    const speakersPool = await this.membersService.findOnlineSpeakers();
 
     // Get the 2 most recent sessions to apply chairman exclusion rule
     const recentSessions = await this.sessionRepository.find({
@@ -99,23 +101,20 @@ export class OnlineSessionsService {
         .filter((id): id is string => id !== null),
     );
 
-    // Sort by main_chairman count ascending, then name
-    const chairmanCandidates = [...activeMembers].sort((a, b) => {
-      const aCount = a.role_counts?.['main_chairman'] ?? 0;
-      const bCount = b.role_counts?.['main_chairman'] ?? 0;
-      if (aCount !== bCount) return aCount - bCount;
-      return a.name.localeCompare(b.name);
-    });
-
-    // Main chairman: exclude those in last 2 sessions
-    const mainChairmanCandidates = chairmanCandidates.filter(
-      (m) => !recentMainChairmanIds.has(m.id),
-    );
+    // Main chairman: from chairmenPool, exclude those in last 2 sessions
+    const mainChairmanCandidates = [...chairmenPool]
+      .filter((m) => !recentMainChairmanIds.has(m.id))
+      .sort((a, b) => {
+        const aCount = a.role_counts?.['main_chairman'] ?? 0;
+        const bCount = b.role_counts?.['main_chairman'] ?? 0;
+        if (aCount !== bCount) return aCount - bCount;
+        return a.name.localeCompare(b.name);
+      });
 
     const mainChairman = mainChairmanCandidates[0] ?? null;
 
-    // Sub chairman: exclude main chairman, sort by sub_chairman count
-    const subChairmanCandidates = [...activeMembers]
+    // Sub chairman: from chairmenPool, exclude main chairman
+    const subChairmanCandidates = [...chairmenPool]
       .filter((m) => m.id !== mainChairman?.id)
       .sort((a, b) => {
         const aCount = a.role_counts?.['sub_chairman'] ?? 0;
@@ -126,17 +125,14 @@ export class OnlineSessionsService {
 
     const subChairman = subChairmanCandidates[0] ?? null;
 
-    // Speakers: active, project_level < 10, not already assigned
+    // Speakers: from speakersPool only, project_level < 10,
+    // exclude anyone already assigned as chairman (cross-pool guard)
     const assignedIds = new Set(
       [mainChairman?.id, subChairman?.id].filter(Boolean) as string[],
     );
 
-    const speakerCandidates = activeMembers
-      .filter(
-        (m) =>
-          m.project_level < 10 &&
-          !assignedIds.has(m.id),
-      )
+    const speakerCandidates = speakersPool
+      .filter((m) => m.project_level < 10 && !assignedIds.has(m.id))
       .sort((a, b) => {
         const aCount = a.role_counts?.['speaker'] ?? 0;
         const bCount = b.role_counts?.['speaker'] ?? 0;

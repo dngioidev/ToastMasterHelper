@@ -6,10 +6,8 @@ export interface LoginPayload {
 }
 
 export interface LoginResponse {
-  data: {
-    access_token: string;
-    username: string;
-  };
+  access_token: string;
+  username: string;
 }
 
 export async function loginApi(payload: LoginPayload): Promise<LoginResponse> {

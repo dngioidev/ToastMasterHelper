@@ -9,6 +9,9 @@ export interface Member {
   status: MemberStatus;
   project_level: number;
   role_counts: Record<string, number>;
+  online_as_chairman: boolean;
+  online_as_speaker: boolean;
+  attends_offline: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +27,9 @@ export interface CreateMemberPayload {
   name: string;
   status?: MemberStatus;
   project_level?: number;
+  online_as_chairman?: boolean;
+  online_as_speaker?: boolean;
+  attends_offline?: boolean;
 }
 
 export type UpdateMemberPayload = Partial<CreateMemberPayload>;

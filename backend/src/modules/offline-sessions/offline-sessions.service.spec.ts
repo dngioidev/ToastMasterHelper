@@ -16,6 +16,9 @@ const makeMember = (overrides: Partial<Member> = {}): Member => ({
   status: MemberStatus.ACTIVE,
   project_level: 3,
   role_counts: {},
+  online_as_chairman: true,
+  online_as_speaker: true,
+  attends_offline: true,
   created_at: new Date(),
   updated_at: new Date(),
   ...overrides,
@@ -36,7 +39,7 @@ const makeAssignmentRepo = () => ({
 });
 
 const makeMembersService = () => ({
-  findActiveMembers: jest.fn(),
+  findOfflineMembers: jest.fn(),
   incrementRoleCount: jest.fn().mockResolvedValue(undefined),
   incrementProjectLevel: jest.fn().mockResolvedValue(undefined),
 });
@@ -155,7 +158,7 @@ describe('OfflineSessionsService', () => {
         makeMember({ id: 'eve', name: 'Eve', project_level: 8 }),
         makeMember({ id: 'frank', name: 'Frank', project_level: 9 }),
       ];
-      membersService.findActiveMembers.mockResolvedValue(members);
+      membersService.findOfflineMembers.mockResolvedValue(members);
       const result = await service.suggest(2, 1);
       const speakerIds = result.speakers.map((s) => s.id);
       expect(speakerIds).not.toContain('alice');
@@ -170,7 +173,7 @@ describe('OfflineSessionsService', () => {
       const filler = Array.from({ length: 8 }, (_, i) =>
         makeMember({ id: `f${i}`, name: `Filler${i}`, project_level: 10 }),
       );
-      membersService.findActiveMembers.mockResolvedValue([
+      membersService.findOfflineMembers.mockResolvedValue([
         speaker,
         lowEval,
         highEval,
@@ -192,7 +195,7 @@ describe('OfflineSessionsService', () => {
       const members = Array.from({ length: 12 }, (_, i) =>
         makeMember({ id: `m${i}`, name: `Member${i}`, project_level: 3 + (i % 5) }),
       );
-      membersService.findActiveMembers.mockResolvedValue(members);
+      membersService.findOfflineMembers.mockResolvedValue(members);
       const result = await service.suggest(2, 1);
       const allAssigned = [
         result.toast_master?.id,

@@ -129,7 +129,7 @@ export class OfflineSessionsService {
     numSpeakers = 2,
     numBackup = 1,
   ): Promise<OfflineSuggestResult> {
-    const activeMembers = await this.membersService.findActiveMembers();
+    const activeMembers = await this.membersService.findOfflineMembers();
     const assigned = new Set<string>();
 
     const pickOne = (
